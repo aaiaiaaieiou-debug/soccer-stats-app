@@ -67,7 +67,7 @@
             window.firebase.setLogLevel('debug');
         } catch (e) {
             console.error("Firebase initialization error:", e);
-            document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。設定を確認してください。";
+            document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。Firebaseの設定が正しいか確認してください。";
             return;
         }
 
@@ -105,9 +105,9 @@
                 const unsubscribe = window.firebase.onAuthStateChanged(auth, async (currentUser) => {
                     if (!currentUser) {
                         try {
-                            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                            if (initialAuthToken) await window.firebase.signInWithCustomToken(auth, initialAuthToken);
-                            else await window.firebase.signInAnonymously(auth);
+                           const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                           if (initialAuthToken) await window.firebase.signInWithCustomToken(auth, initialAuthToken);
+                           else await window.firebase.signInAnonymously(auth);
                         } catch (error) { console.error("Authentication failed: ", error); }
                     }
                     setIsAuthReady(true);
