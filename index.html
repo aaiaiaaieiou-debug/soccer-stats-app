@@ -36,11 +36,9 @@
     <div id="root"></div>
 
     <script type="text/babel">
-      // Wait for all resources to load before running the app
       window.onload = function() {
         const { useState, useEffect, useMemo } = React;
         
-        // Check if Recharts is loaded
         if (!window.Recharts) {
             console.error("Recharts library failed to load.");
             document.getElementById('root').innerText = "エラー: グラフライブラリの読み込みに失敗しました。ページを再読み込みしてください。";
@@ -48,7 +46,6 @@
         }
         const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = window.Recharts;
 
-        // Check if Firebase is loaded
         if (!window.firebase) {
             console.error("Firebase library failed to load.");
             document.getElementById('root').innerText = "エラー: データベースライブラリの読み込みに失敗しました。ページを再読み込みしてください。";
@@ -56,7 +53,9 @@
         }
 
         // --- Firebaseの初期化 ---
-        const firebaseConfig = JSON.parse(atob("eyJhcGlLZXkiOiJBSXphU3lDLVp2N0JzX1J2d2d3ZlJ5X0xEWjV5Zk1zM0dJdE1fSWciLCJhdXRoRG9tYWluIjoiZ2VtaW5pLWRldi10b29scy5maXJlYmFzZWFwcC5jb20iLCJwcm9qZWN0SWQiOiJnZW1pbmktZGV2LXRvb2xzIiwic3RvcmFnZUJ1Y2tldCI6ImdlbWluaS1kZXYtdG9vbHMuYXBwc3BvdC5jb20iLCJtZXNzYWdpbmdTZW5kZXJJZCI6IjY3OTg1OTc4NDY0OCIsImFwcElkIjoiMTo2Nzk4NTk3ODQ2NDg6d2ViOmE5ZDEyYjQ3NzM0NmMxYjA3MmQxNTIiLCJtZWFzdXJlbWVudElkIjoiRy0zM1k1S0c0TjJSIn0="));
+        // この環境で動作させるために、元の設定方法に戻しました。
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         let app, db, auth;
         try {
@@ -66,7 +65,7 @@
             window.firebase.setLogLevel('debug');
         } catch (e) {
             console.error("Firebase initialization error:", e);
-            document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。Firebaseの設定が正しいか確認してください。";
+            document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。";
             return;
         }
 
@@ -116,8 +115,11 @@
 
             useEffect(() => {
                 if (!isAuthReady || !db) return;
-                const playersQuery = window.firebase.query(window.firebase.collection(db, `artifacts/${appId}/public/data/players`));
-                const matchesQuery = window.firebase.query(window.firebase.collection(db, `artifacts/${appId}/public/data/matches`));
+                const playersCollectionPath = `artifacts/${appId}/public/data/players`;
+                const matchesCollectionPath = `artifacts/${appId}/public/data/matches`;
+
+                const playersQuery = window.firebase.query(window.firebase.collection(db, playersCollectionPath));
+                const matchesQuery = window.firebase.query(window.firebase.collection(db, matchesCollectionPath));
                 
                 const unsubPlayers = window.firebase.onSnapshot(playersQuery, (snap) => setPlayers(snap.docs.map(d => ({id: d.id, ...d.data()}))), (e) => console.error("Player fetch error", e));
                 const unsubMatches = window.firebase.onSnapshot(matchesQuery, (snap) => setMatches(snap.docs.map(d => ({id: d.id, ...d.data()}))), (e) => console.error("Match fetch error", e));
@@ -474,5 +476,3 @@
     </script>
 </body>
 </html>
-
-
