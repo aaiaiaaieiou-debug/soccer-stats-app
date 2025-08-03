@@ -1,0 +1,438 @@
+import React from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { 
+    getFirestore, 
+    collection, 
+    addDoc, 
+    onSnapshot,
+    doc,
+    updateDoc,
+    deleteDoc,
+    query,
+    setLogLevel
+} from 'firebase/firestore';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+// --- アイコンコンポーネント ---
+const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
+const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
+const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>;
+const IconChevronDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>;
+const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+const IconLock = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
+const IconUnlock = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>;
+
+// チームエンブレムのプレースホルダー
+const TeamEmblemPlaceholder = () => (
+    <svg className="h-14 w-auto mr-4" viewBox="0 0 100 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 10C0 4.47715 4.47715 0 10 0H90C95.5228 0 100 4.47715 100 10V70L50 110L0 70V10Z" fill="#ef4444"/>
+        <path d="M50 0H90C95.5228 0 100 4.47715 100 10V70L50 110V0Z" fill="#38bdf8"/>
+        <path d="M50 35L50 75" stroke="white" strokeWidth="5"/>
+        <path d="M30 55L70 55" stroke="white" strokeWidth="5"/>
+        <path d="M0 10C0 4.47715 4.47715 0 10 0H90C95.5228 0 100 4.47715 100 10V70L50 110L0 70V10Z" stroke="#a0aec0" strokeWidth="2"/>
+    </svg>
+);
+
+
+// --- Firebaseの初期化 ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+setLogLevel('debug');
+
+// --- メインアプリケーションコンポーネント ---
+function App() {
+    const [page, setPage] = React.useState('dashboard');
+    const [players, setPlayers] = React.useState([]);
+    const [matches, setMatches] = React.useState([]);
+    const [user, setUser] = React.useState(null);
+    const [isAuthReady, setIsAuthReady] = React.useState(false);
+    const [editingMatch, setEditingMatch] = React.useState(null);
+    const [isEditMode, setIsEditMode] = React.useState(false);
+    const [showPasswordModal, setShowPasswordModal] = React.useState(false);
+
+    // 認証状態の監視
+    React.useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) setUser(currentUser);
+            else {
+                try {
+                    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                    if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                    else await signInAnonymously(auth);
+                } catch (error) { console.error("Authentication failed: ", error); }
+            }
+            setIsAuthReady(true);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // データ購読 (選手 & 試合)
+    React.useEffect(() => {
+        if (!isAuthReady) return;
+        const playersQuery = query(collection(db, `artifacts/${appId}/public/data/players`));
+        const matchesQuery = query(collection(db, `artifacts/${appId}/public/data/matches`));
+        
+        const unsubPlayers = onSnapshot(playersQuery, (snap) => setPlayers(snap.docs.map(d => ({id: d.id, ...d.data()}))), (e) => console.error("Player fetch error", e));
+        const unsubMatches = onSnapshot(matchesQuery, (snap) => setMatches(snap.docs.map(d => ({id: d.id, ...d.data()}))), (e) => console.error("Match fetch error", e));
+
+        return () => { unsubPlayers(); unsubMatches(); };
+    }, [isAuthReady]);
+
+    const navigate = (pageName, data = null) => {
+        if (pageName.includes('add') || pageName.includes('edit') || pageName.includes('management')) {
+            if (!isEditMode) { setShowPasswordModal(true); return; }
+        }
+        if (pageName === 'edit-match') setEditingMatch(data);
+        else setEditingMatch(null);
+        setPage(pageName);
+    };
+    
+    const handlePasswordSubmit = (password) => {
+        if (password === 'soccer') { setIsEditMode(true); setShowPasswordModal(false); } 
+        else { alert('合言葉が違います。'); }
+    };
+
+    const logout = () => { setIsEditMode(false); setPage('dashboard'); };
+
+    // 選手データの集計
+    const playerStats = React.useMemo(() => {
+        return players.map(player => {
+            const base = player.baseStats || { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+            const calc = { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+            matches.forEach(m => {
+                if ((m.starters || []).includes(player.id)) calc.matchesPlayed++;
+                if ((m.subs || []).includes(player.id)) { calc.matchesPlayed++; calc.subAppearances++; }
+                (m.goals || []).forEach(g => {
+                    if (g.scorerId === player.id) calc.goals++;
+                    if (g.assistId === player.id) calc.assists++;
+                });
+                (m.cautions || []).forEach(c => { if (c.playerId === player.id) calc.cautions++; });
+                (m.ejections || []).forEach(e => { if (e.playerId === player.id) calc.ejections++; });
+            });
+            return {
+                ...player,
+                totalMatchesPlayed: (base.matchesPlayed || 0) + calc.matchesPlayed,
+                totalSubAppearances: (base.subAppearances || 0) + calc.subAppearances,
+                totalGoals: (base.goals || 0) + calc.goals,
+                totalAssists: (base.assists || 0) + calc.assists,
+                totalCautions: (base.cautions || 0) + calc.cautions,
+                totalEjections: (base.ejections || 0) + calc.ejections,
+            };
+        });
+    }, [players, matches]);
+    
+    const renderPage = () => {
+        switch (page) {
+            case 'dashboard': return <Dashboard navigate={navigate} playerStats={playerStats} isEditMode={isEditMode} />;
+            case 'match-list': return <MatchList navigate={navigate} matches={matches} players={players} isEditMode={isEditMode} />;
+            case 'player-management': return <PlayerManagement players={players} />;
+            case 'add-match': return <MatchForm navigate={navigate} players={players} />;
+            case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
+            case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} />;
+            default: return <Dashboard navigate={navigate} playerStats={playerStats} isEditMode={isEditMode}/>;
+        }
+    };
+
+    if (!isAuthReady) return <div className="flex justify-center items-center h-screen bg-gray-800"><div className="text-xl font-semibold text-white">読み込み中...</div></div>;
+
+    return (
+        <div className="bg-gray-900 min-h-screen font-sans text-white">
+            <Header navigate={navigate} isEditMode={isEditMode} onEditModeToggle={() => setShowPasswordModal(true)} onLogout={logout} />
+            <main className="p-4 sm:p-8">{renderPage()}</main>
+            {showPasswordModal && <PasswordModal onSubmit={handlePasswordSubmit} onClose={() => setShowPasswordModal(false)} />}
+        </div>
+    );
+}
+
+// --- ヘッダーコンポーネント ---
+function Header({ navigate, isEditMode, onEditModeToggle, onLogout }) {
+    // Imgurにアップロードして生成した公開URL
+    const emblemUrl = "https://i.imgur.com/h4W4M2S.jpeg";
+
+    return (
+        <header className="bg-gray-800 shadow-lg sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center h-20">
+                    <div className="flex items-center cursor-pointer" onClick={() => navigate('dashboard')}>
+                        {emblemUrl ? <img src={emblemUrl} alt="チームエンブレム" className="h-14 w-auto mr-4"/> : <TeamEmblemPlaceholder />}
+                        <h1 className="text-2xl font-bold text-white tracking-wider">FURUGEN MINAMI FC</h1>
+                    </div>
+                    <nav className="flex items-center space-x-2">
+                        <button onClick={() => navigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
+                        <button onClick={() => navigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
+                        {isEditMode && <button onClick={() => navigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
+                        {isEditMode ? (
+                            <button onClick={onLogout} className="flex items-center bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition-colors shadow-md"><IconUnlock className="mr-2"/>閲覧モード</button>
+                        ) : (
+                            <button onClick={onEditModeToggle} className="flex items-center bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors shadow-md"><IconLock className="mr-2"/>編集モード</button>
+                        )}
+                    </nav>
+                </div>
+            </div>
+        </header>
+    );
+}
+// --- パスワードモーダル ---
+function PasswordModal({ onSubmit, onClose }) {
+    const [password, setPassword] = React.useState('');
+    const handleSubmit = (e) => { e.preventDefault(); onSubmit(password); };
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-sm m-4">
+                <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-white">編集モード</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div>
+                <p className="text-gray-400 mb-4">編集するには合言葉を入力してください。</p>
+                <form onSubmit={handleSubmit}>
+                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white rounded-md shadow-sm py-2 px-3 mb-4 focus:ring-sky-500 focus:border-sky-500" placeholder="合言葉" autoFocus />
+                    <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">決定</button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+// --- ダッシュボードコンポーネント ---
+function Dashboard({ navigate, playerStats, isEditMode }) {
+    const goalRanking = [...playerStats].sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
+    const assistRanking = [...playerStats].sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
+    return (
+        <div className="space-y-8">
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg text-center border border-gray-700">
+                <h2 className="text-3xl font-bold text-white mb-4">TEAM DASHBOARD</h2>
+                <p className="text-gray-400 mb-6">試合結果や選手の成績を記録・管理しましょう。</p>
+                <div className="flex flex-col sm:flex-row justify-center gap-4">
+                    {isEditMode && <button onClick={() => navigate('add-match')} className="bg-red-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-600 transition-colors shadow-md flex items-center justify-center"><IconPlus /> <span className="ml-2">新しい試合を記録</span></button>}
+                    <button onClick={() => navigate('player-stats')} className="bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-colors shadow-md">選手成績一覧を見る</button>
+                </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-8">
+                <RankingCard title="得点ランキング" ranking={goalRanking} dataKey="totalGoals" unit="点" color="#ef4444" />
+                <RankingCard title="アシストランキング" ranking={assistRanking} dataKey="totalAssists" unit="回" color="#38bdf8" />
+            </div>
+        </div>
+    );
+}
+
+// --- ランキングカードコンポーネント ---
+function RankingCard({ title, ranking, dataKey, unit, color }) {
+    return (
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+            <h3 className="text-xl font-semibold mb-4 text-white">{title}</h3>
+            {ranking.some(r => r[dataKey] > 0) ? (
+                 <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={ranking} layout="vertical" margin={{ top: 5, right: 20, left: 60, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4a5568" />
+                        <XAxis type="number" allowDecimals={false} stroke="#a0aec0" />
+                        <YAxis dataKey="name" type="category" width={80} stroke="#a0aec0" />
+                        <Tooltip contentStyle={{ backgroundColor: '#2d3748', border: '1px solid #4a5568' }} />
+                        <Bar dataKey={dataKey} fill={color} barSize={20} />
+                    </BarChart>
+                </ResponsiveContainer>
+            ) : (<p className="text-gray-500">まだ記録がありません。</p>)}
+        </div>
+    );
+}
+
+
+// --- 選手管理コンポーネント ---
+function PlayerManagement({ players }) {
+    const [name, setName] = React.useState('');
+    const [number, setNumber] = React.useState('');
+    const [editingPlayer, setEditingPlayer] = React.useState(null);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!name || !number) { alert("選手名と背番号を入力してください。"); return; }
+        const playersCollectionPath = `artifacts/${appId}/public/data/players`;
+        const playerData = { name, number: parseInt(number, 10) };
+        if (editingPlayer) {
+            await updateDoc(doc(db, playersCollectionPath, editingPlayer.id), playerData);
+            setEditingPlayer(null);
+        } else {
+            playerData.baseStats = { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+            await addDoc(collection(db, playersCollectionPath), playerData);
+        }
+        setName(''); setNumber('');
+    };
+
+    const handleEdit = (player) => { setEditingPlayer(player); setName(player.name); setNumber(player.number); };
+    const handleDelete = async (id) => {
+        try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/players`, id)); } 
+        catch (error) { console.error("Error deleting player: ", error); alert("選手の削除中にエラーが発生しました。"); }
+    };
+    
+    const sortedPlayers = [...players].sort((a,b) => a.number - b.number);
+
+    return (
+        <div className="max-w-4xl mx-auto">
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 mb-8">
+                <h2 className="text-2xl font-semibold mb-4">{editingPlayer ? '選手情報を編集' : '新しい選手を追加'}</h2>
+                <form onSubmit={handleSubmit} className="grid sm:grid-cols-3 gap-4 items-end">
+                    <div><label htmlFor="playerName" className="block text-sm font-medium text-gray-400">選手名</label><input type="text" id="playerName" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：山田 太郎" /></div>
+                    <div><label htmlFor="playerNumber" className="block text-sm font-medium text-gray-400">背番号</label><input type="number" id="playerNumber" value={number} onChange={(e) => setNumber(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：10" /></div>
+                    <div className="flex space-x-2">
+                         <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">{editingPlayer ? '更新' : '追加'}</button>
+                         {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
+                    </div>
+                </form>
+            </div>
+            <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700"><h2 className="text-2xl font-semibold p-6">選手一覧</h2><div className="overflow-x-auto"><table className="w-full text-left">
+                <thead className="bg-gray-900"><tr>
+                    <th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">背番号</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">選手名</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">操作</th>
+                </tr></thead>
+                <tbody className="divide-y divide-gray-700">{sortedPlayers.map(player => (
+                    <tr key={player.id} className="hover:bg-gray-700">
+                        <td className="px-6 py-4 font-medium">{player.number}</td><td className="px-6 py-4">{player.name}</td>
+                        <td className="px-6 py-4 flex space-x-2">
+                            <button onClick={() => handleEdit(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
+                            <button onClick={() => handleDelete(player.id)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
+                        </td>
+                    </tr>
+                ))}</tbody>
+            </table></div></div>
+        </div>
+    );
+}
+
+// --- 試合一覧コンポーネント ---
+function MatchList({ navigate, matches, players, isEditMode }) {
+    const getPlayerName = (id) => players.find(p => p.id === id)?.name || '不明';
+    const sortedMatches = [...matches].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const handleDelete = async (id) => {
+        try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/matches`, id)); } 
+        catch (error) { console.error("Error deleting match: ", error); alert("試合記録の削除中にエラーが発生しました。"); }
+    };
+    return (
+        <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
+            <h2 className="text-2xl font-semibold p-6 text-white">試合一覧</h2>
+            <div className="space-y-4 p-6 pt-0">
+                {sortedMatches.map(match => (
+                    <details key={match.id} className="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                        <summary className="font-semibold cursor-pointer flex justify-between items-center">
+                            <div className="flex-grow">
+                                <span className="text-sky-400">{match.date}</span> {match.tournamentName && `[${match.tournamentName}]`} vs {match.opponent} 
+                                <span className="ml-4 text-lg font-bold">{match.ownScore} - {match.opponentScore}</span> 
+                                <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${match.result === '勝利' ? 'bg-green-500 text-white' : match.result === '敗戦' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>{match.result}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 flex-shrink-0">
+                                {isEditMode && <>
+                                    <button onClick={(e) => { e.stopPropagation(); navigate('edit-match', match); }} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDelete(match.id); }} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
+                                </>}
+                                <IconChevronDown />
+                            </div>
+                        </summary>
+                        <div className="mt-4 pt-4 border-t border-gray-700 grid md:grid-cols-2 gap-4 text-sm text-gray-300">
+                            <div><p><strong>試合形式:</strong> {match.matchType}</p><p><strong>会場:</strong> {match.venue}</p></div>
+                            <div><p><strong>形式:</strong> {match.format}</p><p><strong>天気:</strong> {match.weather}</p></div>
+                            <div className="md:col-span-2"><p><strong>得点者:</strong> {(match.goals || []).map(g => `${getPlayerName(g.scorerId)}${g.assistId ? ` (${getPlayerName(g.assistId)})` : ''}`).join(', ') || 'なし'}</p></div>
+                        </div>
+                    </details>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// --- 選手成績一覧コンポーネント ---
+function PlayerStatsList({ playerStats, isEditMode }) {
+    const [sortConfig, setSortConfig] = React.useState({ key: 'number', direction: 'ascending' });
+    const [editingPlayer, setEditingPlayer] = React.useState(null);
+    const sortedPlayerStats = React.useMemo(() => {
+        let sortableItems = [...playerStats];
+        if (sortConfig.key) {
+            sortableItems.sort((a, b) => {
+                const valA = a[sortConfig.key] ?? 0;
+                const valB = b[sortConfig.key] ?? 0;
+                if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
+                if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
+                return 0;
+            });
+        }
+        return sortableItems;
+    }, [playerStats, sortConfig]);
+    const requestSort = (key) => {
+        let direction = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') direction = 'descending';
+        setSortConfig({ key, direction });
+    };
+    const handleUpdateStats = async (playerId, newBaseStats) => {
+        try {
+            await updateDoc(doc(db, `artifacts/${appId}/public/data/players`, playerId), { baseStats: newBaseStats });
+            setEditingPlayer(null);
+        } catch (error) { console.error("Error updating stats: ", error); alert("成績の更新中にエラーが発生しました。"); }
+    };
+    const columns = [
+        { label: '番号', key: 'number' }, { label: '選手名', key: 'name' }, { label: '出場', key: 'totalMatchesPlayed' },
+        { label: '途中', key: 'totalSubAppearances' }, { label: '得点', key: 'totalGoals' }, { label: 'アシスト', key: 'totalAssists' },
+        { label: '警告', key: 'totalCautions' }, { label: '退場', key: 'totalEjections' }
+    ];
+    if (isEditMode) columns.push({ label: '操作', key: 'actions' });
+
+    return (
+        <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+            <h2 className="text-2xl font-semibold p-6">選手成績一覧</h2>
+            <div className="overflow-x-auto"><table className="w-full text-left">
+                <thead className="bg-gray-900"><tr>{columns.map(col => (
+                    <th key={col.key} className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wider cursor-pointer" onClick={() => col.key !== 'actions' && requestSort(col.key)}>
+                        {col.label} {sortConfig.key === col.key && (sortConfig.direction === 'ascending' ? ' ▲' : ' ▼')}
+                    </th>
+                ))}</tr></thead>
+                <tbody className="divide-y divide-gray-700">{sortedPlayerStats.map(player => (
+                    <tr key={player.id} className="hover:bg-gray-700">
+                        {columns.map(col => <td key={col.key} className={`px-6 py-4 ${col.key === 'name' ? 'font-bold' : ''}`}>
+                            {col.key === 'actions' ? 
+                                <button onClick={() => setEditingPlayer(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button> :
+                                player[col.key]
+                            }
+                        </td>)}
+                    </tr>
+                ))}</tbody>
+            </table></div>
+            {editingPlayer && <EditStatsModal player={editingPlayer} onSave={handleUpdateStats} onClose={() => setEditingPlayer(null)} />}
+        </div>
+    );
+}
+
+// --- その他のコンポーネント (変更なし、簡潔化のため省略) ---
+function MatchForm({ navigate, players, existingMatch }) {
+    const [match, setMatch] = React.useState({ date: '', matchType: 'TRM', opponent: '', venue: '', format: '11人制', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '' });
+    React.useEffect(() => { if (existingMatch) setMatch(existingMatch); }, [existingMatch]);
+    const handleChange = (e) => { const { name, value } = e.target; setMatch(prev => ({ ...prev, [name]: value })); };
+    const handlePlayerSelection = (type, playerId) => setMatch(prev => { const list = prev[type] || []; const newList = list.includes(playerId) ? list.filter(id => id !== playerId) : [...list, playerId]; return { ...prev, [type]: newList }; });
+    const addGoal = () => setMatch(prev => ({ ...prev, goals: [...(prev.goals || []), { scorerId: '', assistId: '' }] }));
+    const handleGoalChange = (index, field, value) => setMatch(prev => { const newGoals = [...prev.goals]; newGoals[index][field] = value; return { ...prev, goals: newGoals }; });
+    const removeGoal = (index) => setMatch(prev => ({ ...prev, goals: prev.goals.filter((_, i) => i !== index) }));
+    const addCard = (type) => setMatch(prev => ({ ...prev, [type]: [...(prev[type] || []), { playerId: '' }] }));
+    const handleCardChange = (type, index, value) => setMatch(prev => { const newCards = [...prev[type]]; newCards[index].playerId = value; return { ...prev, [type]: newCards }; });
+    const removeCard = (type, index) => setMatch(prev => ({ ...prev, [type]: prev[type].filter((_, i) => i !== index) }));
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const path = `artifacts/${appId}/public/data/matches`;
+        const data = { ...match, ownScore: parseInt(match.ownScore, 10) || 0, opponentScore: parseInt(match.opponentScore, 10) || 0 };
+        try {
+            if (existingMatch) await updateDoc(doc(db, path, existingMatch.id), data);
+            else await addDoc(collection(db, path), data);
+            alert(existingMatch ? "試合結果を更新しました。" : "試合結果を保存しました。");
+            navigate('match-list');
+        } catch (error) { console.error("Error saving document: ", error); alert("保存中にエラーが発生しました。"); }
+    };
+    const participatingPlayers = [...(match.starters || []), ...(match.subs || [])].map(id => players.find(p => p.id === id)).filter(Boolean);
+    return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6"><InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required /><SelectField label="試合形式" name="matchType" value={match.matchType} onChange={handleChange} options={['TRM', '公式戦', 'カップ戦', 'その他']} />{(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}<InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required /><InputField label="会場" name="venue" value={match.venue} onChange={handleChange} placeholder="例：〇〇グラウンド" /><SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['11人制', '8人制', 'フットサル', 'その他']} /><SelectField label="天気" name="weather" value={match.weather} onChange={handleChange} options={['晴れ', '曇り', '雨', '雪']} /><SelectField label="結果" name="result" value={match.result} onChange={handleChange} options={['勝利', '敗戦', '引分']} /><InputField label="自チーム得点" type="number" name="ownScore" value={match.ownScore} onChange={handleChange} /><InputField label="相手チーム得点" type="number" name="opponentScore" value={match.opponentScore} onChange={handleChange} /></div></FormSection><FormSection title="出場選手"><div className="grid md:grid-cols-2 gap-8"><PlayerSelection a_title="先発出場選手" type="starters" selectedPlayers={match.starters || []} allPlayers={players} onSelect={handlePlayerSelection} /><PlayerSelection a_title="途中出場選手" type="subs" selectedPlayers={match.subs || []} allPlayers={players} onSelect={handlePlayerSelection} /></div></FormSection><FormSection title="得点記録">{(match.goals || []).map((goal, index) => (<div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4 p-4 bg-gray-900 rounded-lg"><SelectField label={`得点者 ${index + 1}`} name="scorerId" value={goal.scorerId} onChange={(e) => handleGoalChange(index, 'scorerId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="得点者を選択" /><SelectField label={`アシスト ${index + 1}`} name="assistId" value={goal.assistId} onChange={(e) => handleGoalChange(index, 'assistId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="アシスト者を選択" /><button type="button" onClick={() => removeGoal(index)} className="mt-6 bg-red-800 text-white px-3 py-2 rounded-md hover:bg-red-700">削除</button></div>))}<button type="button" onClick={addGoal} className="bg-sky-800 text-sky-200 font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition duration-300">得点を追加</button></FormSection><FormSection title="警告・退場"><div className="grid md:grid-cols-2 gap-8"><div><h4 className="font-semibold text-gray-300 mb-2">警告</h4>{(match.cautions || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('cautions', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('cautions', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('cautions')} className="text-sm text-sky-400 hover:underline">警告を追加</button></div><div><h4 className="font-semibold text-gray-300 mb-2">退場</h4>{(match.ejections || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('ejections', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('ejections', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('ejections')} className="text-sm text-sky-400 hover:underline">退場を追加</button></div></div></FormSection><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={() => navigate('match-list')} className="bg-gray-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-500">保存</button></div></form>);
+}
+const FormSection = ({ title, children }) => (<div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700"><h3 className="text-xl font-semibold mb-6 border-b border-gray-700 pb-3 text-white">{title}</h3>{children}</div>);
+const InputField = ({ label, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><input {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" /></div>);
+const SelectField = ({ label, name, value, onChange, options, defaultOption, ...props }) => (<div>{label && <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>}<select name={name} value={value} onChange={onChange} {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">{defaultOption && <option value="">{defaultOption}</option>}{options.map((opt, index) => (typeof opt === 'object' ? <option key={opt.value || index} value={opt.value}>{opt.label}</option> : <option key={opt} value={opt}>{opt}</option>))}</select></div>);
+const PlayerSelection = ({ a_title, type, selectedPlayers, allPlayers, onSelect }) => { const sortedPlayers = [...allPlayers].sort((a,b) => a.number - b.number); return (<div><h4 className="font-semibold text-gray-300 mb-3">{a_title}</h4><div className="space-y-2 max-h-60 overflow-y-auto border border-gray-700 p-3 rounded-md bg-gray-900">{sortedPlayers.map(player => (<label key={player.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-700 cursor-pointer"><input type="checkbox" className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500" checked={selectedPlayers.includes(player.id)} onChange={() => onSelect(type, player.id)} /><span className="text-gray-300"><span className="font-mono w-6 inline-block">{player.number}</span> {player.name}</span></label>))}</div></div>);};
+function EditStatsModal({ player, onSave, onClose }) {
+    const [stats, setStats] = React.useState(player.baseStats || { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 });
+    const handleChange = (e) => setStats(prev => ({ ...prev, [e.target.name]: parseInt(e.target.value, 10) || 0 }));
+    const handleSubmit = (e) => { e.preventDefault(); onSave(player.id, stats); };
+    const fields = [{ label: '出場試合数', name: 'matchesPlayed' }, { label: '途中出場数', name: 'subAppearances' }, { label: '得点', name: 'goals' }, { label: 'アシスト', name: 'assists' }, { label: '警告', name: 'cautions' }, { label: '退場', name: 'ejections' }];
+    return (<div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50"><div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-md m-4"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-white">{player.name} の基礎記録を編集</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div><p className="text-sm text-gray-400 mb-6">ここでの入力は、アプリで記録された成績に加算される基礎値となります。</p><form onSubmit={handleSubmit}><div className="grid grid-cols-2 gap-4">{fields.map(f => (<div key={f.name}><label className="block text-sm font-medium text-gray-400">{f.label}</label><input type="number" name={f.name} value={stats[f.name]} onChange={handleChange} className="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3" /></div>))}</div><div className="mt-8 flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">保存</button></div></form></div></div>);
+}
+
+export default App;
