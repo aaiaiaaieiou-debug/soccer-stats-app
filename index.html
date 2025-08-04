@@ -53,7 +53,14 @@
         }
 
         // --- Firebaseの初期化 ---
-        const firebaseConfig = JSON.parse(atob("eyJhcGlLZXkiOiJBSXphU3lDLVp2N0JzX1J2d2d3ZlJ5X0xEWjV5Zk1zM0dJdE1fSWciLCJhdXRoRG9tYWluIjoiZ2VtaW5pLWRldi10b29scy5maXJlYmFzZWFwcC5jb20iLCJwcm9qZWN0SWQiOiJnZW1pbmktZGV2LXRvb2xzIiwic3RvcmFnZUJ1Y2tldCI6ImdlbWluaS1kZXYtdG9vbHMuYXBwc3BvdC5jb20iLCJtZXNzYWdpbmdTZW5kZXJJZCI6IjY3OTg1OTc4NDY0OCIsImFwcElkIjoiMTo2Nzk4NTk3ODQ2NDg6d2ViOmE5ZDEyYjQ3NzM0NmMxYjA3MmQxNTIiLCJtZWFzdXJlbWVudElkIjoiRy0zM1k1S0c0TjJSIn0="));
+        const firebaseConfig = {
+  apiKey: "AIzaSyCmU2dJyLFFpODmuD7mkQJwDszvIo7xU68",
+  authDomain: "soccer-stats-fmfc.firebaseapp.com",
+  projectId: "soccer-stats-fmfc",
+  storageBucket: "soccer-stats-fmfc.firebasestorage.app",
+  messagingSenderId: "812354510220",
+  appId: "1:812354510220:web:966a4d86b2d49652facaa9"
+};
         const appId = firebaseConfig.projectId;
 
         let app, db, auth;
@@ -473,3 +480,4 @@
     </script>
 </body>
 </html>
+
