@@ -54,13 +54,13 @@
 
         // --- Firebaseの初期化 ---
         const firebaseConfig = {
-  apiKey: "AIzaSyCmU2dJyLFFpODmuD7mkQJwDszvIo7xU68",
-  authDomain: "soccer-stats-fmfc.firebaseapp.com",
-  projectId: "soccer-stats-fmfc",
-  storageBucket: "soccer-stats-fmfc.firebasestorage.app",
-  messagingSenderId: "812354510220",
-  appId: "1:812354510220:web:966a4d86b2d49652facaa9"
-};
+          apiKey: "AIzaSyCmU2dJyLFFpODmuD7mkQJwDszvIo7xU68",
+          authDomain: "soccer-stats-fmfc.firebaseapp.com",
+          projectId: "soccer-stats-fmfc",
+          storageBucket: "soccer-stats-fmfc.appspot.com",
+          messagingSenderId: "812354510220",
+          appId: "1:812354510220:web:966a4d86b2d49652facaa9"
+        };
         const appId = firebaseConfig.projectId;
 
         let app, db, auth;
@@ -282,13 +282,15 @@
         function PlayerManagement({ players }) {
             const [name, setName] = useState('');
             const [number, setNumber] = useState('');
+            const [category, setCategory] = useState('U12');
             const [editingPlayer, setEditingPlayer] = useState(null);
+            const categories = ['U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!name || !number) { alert("選手名と背番号を入力してください。"); return; }
+                if (!name || !number || !category) { alert("カテゴリー、選手名、背番号を入力してください。"); return; }
                 const playersCollectionPath = `artifacts/${appId}/public/data/players`;
-                const playerData = { name, number: parseInt(number, 10) };
+                const playerData = { name, number: parseInt(number, 10), category };
                 if (editingPlayer) {
                     await window.firebase.updateDoc(window.firebase.doc(db, playersCollectionPath, editingPlayer.id), playerData);
                     setEditingPlayer(null);
@@ -296,10 +298,15 @@
                     playerData.baseStats = { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
                     await window.firebase.addDoc(window.firebase.collection(db, playersCollectionPath), playerData);
                 }
-                setName(''); setNumber('');
+                setName(''); setNumber(''); setCategory('U12');
             };
 
-            const handleEdit = (player) => { setEditingPlayer(player); setName(player.name); setNumber(player.number); };
+            const handleEdit = (player) => { 
+                setEditingPlayer(player); 
+                setName(player.name); 
+                setNumber(player.number); 
+                setCategory(player.category || 'U12');
+            };
             const handleDelete = async (id) => {
                 try { await window.firebase.deleteDoc(window.firebase.doc(db, `artifacts/${appId}/public/data/players`, id)); } 
                 catch (error) { console.error("Error deleting player: ", error); alert("選手の削除中にエラーが発生しました。"); }
@@ -308,25 +315,30 @@
             const sortedPlayers = [...players].sort((a,b) => a.number - b.number);
 
             return (
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-5xl mx-auto">
                     <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 mb-8">
                         <h2 className="text-2xl font-semibold mb-4">{editingPlayer ? '選手情報を編集' : '新しい選手を追加'}</h2>
-                        <form onSubmit={handleSubmit} className="grid sm:grid-cols-3 gap-4 items-end">
+                        <form onSubmit={handleSubmit} className="grid sm:grid-cols-4 gap-4 items-end">
+                            <div><label htmlFor="playerCategory" className="block text-sm font-medium text-gray-400">カテゴリー</label>
+                                <select id="playerCategory" value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
+                            </div>
                             <div><label htmlFor="playerName" className="block text-sm font-medium text-gray-400">選手名</label><input type="text" id="playerName" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：山田 太郎" /></div>
                             <div><label htmlFor="playerNumber" className="block text-sm font-medium text-gray-400">背番号</label><input type="number" id="playerNumber" value={number} onChange={(e) => setNumber(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：10" /></div>
                             <div className="flex space-x-2">
                                  <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">{editingPlayer ? '更新' : '追加'}</button>
-                                 {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
+                                 {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); setCategory('U12'); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
                             </div>
                         </form>
                     </div>
                     <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700"><h2 className="text-2xl font-semibold p-6">選手一覧</h2><div className="overflow-x-auto"><table className="w-full text-left">
                         <thead className="bg-gray-900"><tr>
-                            <th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">背番号</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">選手名</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">操作</th>
+                            <th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">カテゴリー</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">背番号</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">選手名</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">操作</th>
                         </tr></thead>
                         <tbody className="divide-y divide-gray-700">{sortedPlayers.map(player => (
                             <tr key={player.id} className="hover:bg-gray-700">
-                                <td className="px-6 py-4 font-medium">{player.number}</td><td className="px-6 py-4">{player.name}</td>
+                                <td className="px-6 py-4">{player.category}</td><td className="px-6 py-4 font-medium">{player.number}</td><td className="px-6 py-4">{player.name}</td>
                                 <td className="px-6 py-4 flex space-x-2">
                                     <button onClick={() => handleEdit(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
                                     <button onClick={() => handleDelete(player.id)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
@@ -405,7 +417,7 @@
                 } catch (error) { console.error("Error updating stats: ", error); alert("成績の更新中にエラーが発生しました。"); }
             };
             const columns = [
-                { label: '番号', key: 'number' }, { label: '選手名', key: 'name' }, { label: '出場', key: 'totalMatchesPlayed' },
+                { label: 'カテゴリー', key: 'category' }, { label: '番号', key: 'number' }, { label: '選手名', key: 'name' }, { label: '出場', key: 'totalMatchesPlayed' },
                 { label: '途中', key: 'totalSubAppearances' }, { label: '得点', key: 'totalGoals' }, { label: 'アシスト', key: 'totalAssists' },
                 { label: '警告', key: 'totalCautions' }, { label: '退場', key: 'totalEjections' }
             ];
@@ -437,8 +449,22 @@
         }
         
         function MatchForm({ navigate, players, existingMatch }) {
-            const [match, setMatch] = useState({ date: '', matchType: 'TRM', opponent: '', venue: '', format: '11人制', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '' });
+            const [match, setMatch] = useState({ date: '', matchType: 'TRM', opponent: '', venue: '', format: '8人制', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '' });
+            const [categoryFilter, setCategoryFilter] = useState('All');
+            const categories = ['All', 'U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
+
             useEffect(() => { if (existingMatch) setMatch(existingMatch); }, [existingMatch]);
+            
+            const filteredPlayers = useMemo(() => {
+                if (categoryFilter === 'All') return players;
+                const filterAge = parseInt(categoryFilter.replace('U', ''));
+                return players.filter(p => {
+                    if (!p.category) return false;
+                    const playerAge = parseInt(p.category.replace('U', ''));
+                    return playerAge <= filterAge;
+                });
+            }, [players, categoryFilter]);
+
             const handleChange = (e) => { const { name, value } = e.target; setMatch(prev => ({ ...prev, [name]: value })); };
             const handlePlayerSelection = (type, playerId) => setMatch(prev => { const list = prev[type] || []; const newList = list.includes(playerId) ? list.filter(id => id !== playerId) : [...list, playerId]; return { ...prev, [type]: newList }; });
             const addGoal = () => setMatch(prev => ({ ...prev, goals: [...(prev.goals || []), { scorerId: '', assistId: '' }] }));
@@ -459,7 +485,19 @@
                 } catch (error) { console.error("Error saving document: ", error); alert("保存中にエラーが発生しました。"); }
             };
             const participatingPlayers = [...(match.starters || []), ...(match.subs || [])].map(id => players.find(p => p.id === id)).filter(Boolean);
-            return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6"><InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required /><SelectField label="試合形式" name="matchType" value={match.matchType} onChange={handleChange} options={['TRM', '公式戦', 'カップ戦', 'その他']} />{(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}<InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required /><InputField label="会場" name="venue" value={match.venue} onChange={handleChange} placeholder="例：〇〇グラウンド" /><SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['11人制', '8人制', 'フットサル', 'その他']} /><SelectField label="天気" name="weather" value={match.weather} onChange={handleChange} options={['晴れ', '曇り', '雨', '雪']} /><SelectField label="結果" name="result" value={match.result} onChange={handleChange} options={['勝利', '敗戦', '引分']} /><InputField label="自チーム得点" type="number" name="ownScore" value={match.ownScore} onChange={handleChange} /><InputField label="相手チーム得点" type="number" name="opponentScore" value={match.opponentScore} onChange={handleChange} /></div></FormSection><FormSection title="出場選手"><div className="grid md:grid-cols-2 gap-8"><PlayerSelection a_title="先発出場選手" type="starters" selectedPlayers={match.starters || []} allPlayers={players} onSelect={handlePlayerSelection} /><PlayerSelection a_title="途中出場選手" type="subs" selectedPlayers={match.subs || []} allPlayers={players} onSelect={handlePlayerSelection} /></div></FormSection><FormSection title="得点記録">{(match.goals || []).map((goal, index) => (<div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4 p-4 bg-gray-900 rounded-lg"><SelectField label={`得点者 ${index + 1}`} name="scorerId" value={goal.scorerId} onChange={(e) => handleGoalChange(index, 'scorerId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="得点者を選択" /><SelectField label={`アシスト ${index + 1}`} name="assistId" value={goal.assistId} onChange={(e) => handleGoalChange(index, 'assistId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="アシスト者を選択" /><button type="button" onClick={() => removeGoal(index)} className="mt-6 bg-red-800 text-white px-3 py-2 rounded-md hover:bg-red-700">削除</button></div>))}<button type="button" onClick={addGoal} className="bg-sky-800 text-sky-200 font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition duration-300">得点を追加</button></FormSection><FormSection title="警告・退場"><div className="grid md:grid-cols-2 gap-8"><div><h4 className="font-semibold text-gray-300 mb-2">警告</h4>{(match.cautions || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('cautions', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('cautions', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('cautions')} className="text-sm text-sky-400 hover:underline">警告を追加</button></div><div><h4 className="font-semibold text-gray-300 mb-2">退場</h4>{(match.ejections || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('ejections', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('ejections', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('ejections')} className="text-sm text-sky-400 hover:underline">退場を追加</button></div></div></FormSection><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={() => navigate('match-list')} className="bg-gray-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-500">保存</button></div></form>);
+            return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6"><InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required /><SelectField label="試合形式" name="matchType" value={match.matchType} onChange={handleChange} options={['TRM', '公式戦', 'カップ戦', 'その他']} />{(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}<InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required /><InputField label="会場" name="venue" value={match.venue} onChange={handleChange} placeholder="例：〇〇グラウンド" /><SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['8人制', '11人制', 'フットサル', 'その他']} /><SelectField label="天気" name="weather" value={match.weather} onChange={handleChange} options={['晴れ', '曇り', '雨', '雪']} /><SelectField label="結果" name="result" value={match.result} onChange={handleChange} options={['勝利', '敗戦', '引分']} /><InputField label="自チーム得点" type="number" name="ownScore" value={match.ownScore} onChange={handleChange} /><InputField label="相手チーム得点" type="number" name="opponentScore" value={match.opponentScore} onChange={handleChange} /></div></FormSection>
+            <FormSection title="出場選手">
+                <div className="mb-4"><label htmlFor="categoryFilter" className="block text-sm font-medium text-gray-400">試合のカテゴリーで選手を絞り込み</label>
+                    <select id="categoryFilter" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="mt-1 block w-full md:w-1/3 bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                </div>
+                <div className="grid md:grid-cols-2 gap-8">
+                    <PlayerSelection a_title="先発出場選手" type="starters" selectedPlayers={match.starters || []} allPlayers={filteredPlayers} onSelect={handlePlayerSelection} />
+                    <PlayerSelection a_title="途中出場選手" type="subs" selectedPlayers={match.subs || []} allPlayers={filteredPlayers} onSelect={handlePlayerSelection} />
+                </div>
+            </FormSection>
+            <FormSection title="得点記録">{(match.goals || []).map((goal, index) => (<div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4 p-4 bg-gray-900 rounded-lg"><SelectField label={`得点者 ${index + 1}`} name="scorerId" value={goal.scorerId} onChange={(e) => handleGoalChange(index, 'scorerId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="得点者を選択" /><SelectField label={`アシスト ${index + 1}`} name="assistId" value={goal.assistId} onChange={(e) => handleGoalChange(index, 'assistId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="アシスト者を選択" /><button type="button" onClick={() => removeGoal(index)} className="mt-6 bg-red-800 text-white px-3 py-2 rounded-md hover:bg-red-700">削除</button></div>))}<button type="button" onClick={addGoal} className="bg-sky-800 text-sky-200 font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition duration-300">得点を追加</button></FormSection><FormSection title="警告・退場"><div className="grid md:grid-cols-2 gap-8"><div><h4 className="font-semibold text-gray-300 mb-2">警告</h4>{(match.cautions || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('cautions', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('cautions', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('cautions')} className="text-sm text-sky-400 hover:underline">警告を追加</button></div><div><h4 className="font-semibold text-gray-300 mb-2">退場</h4>{(match.ejections || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('ejections', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('ejections', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('ejections')} className="text-sm text-sky-400 hover:underline">退場を追加</button></div></div></FormSection><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={() => navigate('match-list')} className="bg-gray-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-500">保存</button></div></form>);
         }
         
         const FormSection = ({ title, children }) => (<div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700"><h3 className="text-xl font-semibold mb-6 border-b border-gray-700 pb-3 text-white">{title}</h3>{children}</div>);
@@ -480,4 +518,3 @@
     </script>
 </body>
 </html>
-
