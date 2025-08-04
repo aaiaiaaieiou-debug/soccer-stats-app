@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>サッカー試合記録アプリ</title>
+    <title>古堅南FC 試合記録アプリ</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React Libraries -->
@@ -149,11 +149,14 @@
 
             const playerStats = useMemo(() => {
                 return players.map(player => {
-                    const base = player.baseStats || { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
-                    const calc = { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+                    const base = player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+                    const calc = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
                     matches.forEach(m => {
-                        if ((m.starters || []).includes(player.id)) calc.matchesPlayed++;
-                        if ((m.subs || []).includes(player.id)) { calc.matchesPlayed++; calc.subAppearances++; }
+                        const isStarter = (m.starters || []).includes(player.id);
+                        const isSub = (m.subs || []).includes(player.id);
+                        if (isStarter || isSub) {
+                            calc.matchesPlayed++;
+                        }
                         (m.goals || []).forEach(g => {
                             if (g.scorerId === player.id) calc.goals++;
                             if (g.assistId === player.id) calc.assists++;
@@ -164,7 +167,6 @@
                     return {
                         ...player,
                         totalMatchesPlayed: (base.matchesPlayed || 0) + calc.matchesPlayed,
-                        totalSubAppearances: (base.subAppearances || 0) + calc.subAppearances,
                         totalGoals: (base.goals || 0) + calc.goals,
                         totalAssists: (base.assists || 0) + calc.assists,
                         totalCautions: (base.cautions || 0) + calc.cautions,
@@ -295,7 +297,7 @@
                     await window.firebase.updateDoc(window.firebase.doc(db, playersCollectionPath, editingPlayer.id), playerData);
                     setEditingPlayer(null);
                 } else {
-                    playerData.baseStats = { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+                    playerData.baseStats = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
                     await window.firebase.addDoc(window.firebase.collection(db, playersCollectionPath), playerData);
                 }
                 setName(''); setNumber(''); setCategory('U12');
@@ -417,8 +419,8 @@
                 } catch (error) { console.error("Error updating stats: ", error); alert("成績の更新中にエラーが発生しました。"); }
             };
             const columns = [
-                { label: 'カテゴリー', key: 'category' }, { label: '番号', key: 'number' }, { label: '選手名', key: 'name' }, { label: '出場', key: 'totalMatchesPlayed' },
-                { label: '途中', key: 'totalSubAppearances' }, { label: '得点', key: 'totalGoals' }, { label: 'アシスト', key: 'totalAssists' },
+                { label: 'カテゴリー', key: 'category' }, { label: '番号', key: 'number' }, { label: '選手名', key: 'name' }, { label: '出場試合', key: 'totalMatchesPlayed' },
+                { label: '得点', key: 'totalGoals' }, { label: 'アシスト', key: 'totalAssists' },
                 { label: '警告', key: 'totalCautions' }, { label: '退場', key: 'totalEjections' }
             ];
             if (isEditMode) columns.push({ label: '操作', key: 'actions' });
@@ -506,10 +508,10 @@
         const PlayerSelection = ({ a_title, type, selectedPlayers, allPlayers, onSelect }) => { const sortedPlayers = [...allPlayers].sort((a,b) => a.number - b.number); return (<div><h4 className="font-semibold text-gray-300 mb-3">{a_title}</h4><div className="space-y-2 max-h-60 overflow-y-auto border border-gray-700 p-3 rounded-md bg-gray-900">{sortedPlayers.map(player => (<label key={player.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-700 cursor-pointer"><input type="checkbox" className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500" checked={selectedPlayers.includes(player.id)} onChange={() => onSelect(type, player.id)} /><span className="text-gray-300"><span className="font-mono w-6 inline-block">{player.number}</span> {player.name}</span></label>))}</div></div>);};
         
         function EditStatsModal({ player, onSave, onClose }) {
-            const [stats, setStats] = useState(player.baseStats || { matchesPlayed: 0, subAppearances: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 });
+            const [stats, setStats] = useState(player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 });
             const handleChange = (e) => setStats(prev => ({ ...prev, [e.target.name]: parseInt(e.target.value, 10) || 0 }));
             const handleSubmit = (e) => { e.preventDefault(); onSave(player.id, stats); };
-            const fields = [{ label: '出場試合数', name: 'matchesPlayed' }, { label: '途中出場数', name: 'subAppearances' }, { label: '得点', name: 'goals' }, { label: 'アシスト', name: 'assists' }, { label: '警告', name: 'cautions' }, { label: '退場', name: 'ejections' }];
+            const fields = [{ label: '出場試合数', name: 'matchesPlayed' }, { label: '得点', name: 'goals' }, { label: 'アシスト', name: 'assists' }, { label: '警告', name: 'cautions' }, { label: '退場', name: 'ejections' }];
             return (<div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50"><div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-md m-4"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-white">{player.name} の基礎記録を編集</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div><p className="text-sm text-gray-400 mb-6">ここでの入力は、アプリで記録された成績に加算される基礎値となります。</p><form onSubmit={handleSubmit}><div className="grid grid-cols-2 gap-4">{fields.map(f => (<div key={f.name}><label className="block text-sm font-medium text-gray-400">{f.label}</label><input type="number" name={f.name} value={stats[f.name]} onChange={handleChange} className="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3" /></div>))}</div><div className="mt-8 flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">保存</button></div></form></div></div>);
         }
 
