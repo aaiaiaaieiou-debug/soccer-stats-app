@@ -389,15 +389,17 @@
             const sortedPlayerStats = useMemo(() => {
                 let sortableItems = [...playerStats];
                 if (sortConfig.key) {
-                    sortableItems.sort((a, b) => {
+                    sortableItems.sort(function(a, b) { // Changed to function for compatibility
                         let valA, valB;
 
                         if (sortConfig.key === 'category') {
                             valA = a.category ? parseInt(a.category.replace('U', '')) : 0;
                             valB = b.category ? parseInt(b.category.replace('U', '')) : 0;
                         } else {
-                            valA = a[sortConfig.key] || 0;
-                            valB = b[sortConfig.key] || 0;
+                            valA = a[sortConfig.key];
+                            if (valA === undefined || valA === null) valA = 0;
+                            valB = b[sortConfig.key];
+                            if (valB === undefined || valB === null) valB = 0;
                         }
 
                         if (valA < valB) {
