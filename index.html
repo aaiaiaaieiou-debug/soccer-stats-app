@@ -168,13 +168,13 @@
             
             const renderPage = () => {
                 switch (page) {
-                    case 'dashboard': return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} isEditMode={isEditMode} />;
+                    case 'dashboard': return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode} />;
                     case 'match-list': return <MatchList navigate={navigate} matches={matches} players={players} isEditMode={isEditMode} />;
                     case 'player-management': return <PlayerManagement players={players} />;
                     case 'add-match': return <MatchForm navigate={navigate} players={players} />;
                     case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
                     case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} />;
-                    default: return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} isEditMode={isEditMode}/>;
+                    default: return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode}/>;
                 }
             };
 
@@ -232,20 +232,13 @@
             );
         }
 
-        function Dashboard({ navigate, playerStats, matches, isEditMode }) {
-            const goalRanking = [...playerStats].sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
-            const assistRanking = [...playerStats].sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
+        function Dashboard({ navigate, playerStats, matches, players, isEditMode }) {
+            const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
             
+            const last10Matches = useMemo(() => sortedMatches.slice(0, 10), [sortedMatches]);
+
             const teamStats = useMemo(() => {
-                const sortedMatches = [...matches].sort((a, b) => new Date(b.date) - new Date(a.date));
-                const last10Matches = sortedMatches.slice(0, 10);
-
-                let wins = 0;
-                let losses = 0;
-                let draws = 0;
-                let goalsFor = 0;
-                let goalsAgainst = 0;
-
+                let wins = 0, losses = 0, draws = 0, goalsFor = 0, goalsAgainst = 0;
                 last10Matches.forEach(match => {
                     if (match.result === '勝利') wins++;
                     else if (match.result === '敗戦') losses++;
@@ -253,13 +246,25 @@
                     goalsFor += match.ownScore || 0;
                     goalsAgainst += match.opponentScore || 0;
                 });
-                
-                return {
-                    wins, losses, draws, goalsFor, goalsAgainst,
-                    goalDifference: goalsFor - goalsAgainst,
-                    last5Matches: last10Matches.slice(0, 5)
-                };
-            }, [matches]);
+                return { wins, losses, draws, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, last5Matches: last10Matches.slice(0, 5) };
+            }, [last10Matches]);
+
+            const last10Stats = useMemo(() => {
+                const stats = {};
+                players.forEach(p => { stats[p.id] = { name: p.name, goals: 0, assists: 0 }; });
+                last10Matches.forEach(m => {
+                    (m.goals || []).forEach(g => {
+                        if (stats[g.scorerId]) stats[g.scorerId].goals++;
+                        if (stats[g.assistId]) stats[g.assistId].assists++;
+                    });
+                });
+                return Object.values(stats);
+            }, [players, last10Matches]);
+
+            const last10GoalRanking = [...last10Stats].filter(p => p.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, 5);
+            const last10AssistRanking = [...last10Stats].filter(p => p.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, 5);
+            const totalGoalRanking = [...playerStats].sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
+            const totalAssistRanking = [...playerStats].sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
 
             return (
                 <div className="space-y-8">
@@ -276,32 +281,14 @@
                         <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-4">
                             <h3 className="text-xl font-semibold text-white">戦績サマリー (直近10試合)</h3>
                             <div className="flex justify-around text-center">
-                                <div>
-                                    <p className="text-3xl font-bold text-green-400">{teamStats.wins}</p>
-                                    <p className="text-sm text-gray-400">勝利</p>
-                                </div>
-                                <div>
-                                    <p className="text-3xl font-bold text-red-400">{teamStats.losses}</p>
-                                    <p className="text-sm text-gray-400">敗戦</p>
-                                </div>
-                                <div>
-                                    <p className="text-3xl font-bold text-yellow-400">{teamStats.draws}</p>
-                                    <p className="text-sm text-gray-400">引分</p>
-                                </div>
+                                <div><p className="text-3xl font-bold text-green-400">{teamStats.wins}</p><p className="text-sm text-gray-400">勝利</p></div>
+                                <div><p className="text-3xl font-bold text-red-400">{teamStats.losses}</p><p className="text-sm text-gray-400">敗戦</p></div>
+                                <div><p className="text-3xl font-bold text-yellow-400">{teamStats.draws}</p><p className="text-sm text-gray-400">引分</p></div>
                             </div>
                             <div className="flex justify-around text-center pt-4 border-t border-gray-700">
-                                <div>
-                                    <p className="text-3xl font-bold text-sky-400">{teamStats.goalsFor}</p>
-                                    <p className="text-sm text-gray-400">総得点</p>
-                                </div>
-                                <div>
-                                    <p className="text-3xl font-bold text-orange-400">{teamStats.goalsAgainst}</p>
-                                    <p className="text-sm text-gray-400">総失点</p>
-                                </div>
-                                <div>
-                                    <p className={`text-3xl font-bold ${teamStats.goalDifference >= 0 ? 'text-green-400' : 'text-red-400'}`}>{teamStats.goalDifference > 0 ? '+' : ''}{teamStats.goalDifference}</p>
-                                    <p className="text-sm text-gray-400">得失点差</p>
-                                </div>
+                                <div><p className="text-3xl font-bold text-sky-400">{teamStats.goalsFor}</p><p className="text-sm text-gray-400">総得点</p></div>
+                                <div><p className="text-3xl font-bold text-orange-400">{teamStats.goalsAgainst}</p><p className="text-sm text-gray-400">総失点</p></div>
+                                <div><p className={`text-3xl font-bold ${teamStats.goalDifference >= 0 ? 'text-green-400' : 'text-red-400'}`}>{teamStats.goalDifference > 0 ? '+' : ''}{teamStats.goalDifference}</p><p className="text-sm text-gray-400">得失点差</p></div>
                             </div>
                         </div>
                         <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
@@ -322,8 +309,10 @@
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-8">
-                        <RankingCard title="得点ランキング" ranking={goalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
-                        <RankingCard title="アシストランキング" ranking={assistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
+                        <RankingCard title="得点ランキング (直近10試合)" ranking={last10GoalRanking} dataKey="goals" unit="点" color="text-red-400" />
+                        <RankingCard title="アシストランキング (直近10試合)" ranking={last10AssistRanking} dataKey="assists" unit="回" color="text-sky-400" />
+                        <RankingCard title="通算 得点ランキング" ranking={totalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
+                        <RankingCard title="通算 アシストランキング" ranking={totalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
                     </div>
                 </div>
             );
@@ -334,10 +323,10 @@
             return (
                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
                     <h3 className="text-xl font-semibold mb-4 text-white">{title}</h3>
-                    {ranking.some(r => r[dataKey] > 0) ? (
+                    {ranking.length > 0 ? (
                         <ol className="space-y-3">
                             {ranking.map((player, index) => (
-                                <li key={player.id} className="flex items-center justify-between p-3 bg-gray-900 rounded-md">
+                                <li key={player.id || player.name} className="flex items-center justify-between p-3 bg-gray-900 rounded-md">
                                     <div className="flex items-center">
                                         <span className={`text-lg font-bold w-8 ${rankColors[index] || 'text-gray-500'}`}>
                                             {index + 1}.
@@ -520,7 +509,7 @@
             return (
                 <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
                     <h2 className="text-2xl font-semibold p-6">選手成績一覧</h2>
-                    <div className="overflow-x-auto max-h-[calc(100vh-16rem)]">
+                    <div className="overflow-y-auto max-h-[calc(100vh-16rem)]">
                         <table className="w-full text-left">
                             <thead className="bg-gray-900 sticky top-0">
                                 <tr>{columns.map(col => (
