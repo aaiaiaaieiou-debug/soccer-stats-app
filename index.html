@@ -235,36 +235,108 @@
         function Dashboard({ navigate, playerStats, matches, players, isEditMode }) {
             const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
             
-            const last10Matches = useMemo(() => sortedMatches.slice(0, 10), [sortedMatches]);
+            const totalGoalRanking = [...playerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
+            const totalAssistRanking = [...playerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
 
-            const teamStats = useMemo(() => {
-                let wins = 0, losses = 0, draws = 0, goalsFor = 0, goalsAgainst = 0;
-                last10Matches.forEach(match => {
-                    if (match.result === '勝利') wins++;
-                    else if (match.result === '敗戦') losses++;
-                    else if (match.result === '引分') draws++;
-                    goalsFor += match.ownScore || 0;
-                    goalsAgainst += match.opponentScore || 0;
-                });
-                return { wins, losses, draws, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, last5Matches: last10Matches.slice(0, 5) };
-            }, [last10Matches]);
+            const CategoryDashboard = ({ category }) => {
+                const categoryMatches = useMemo(() => sortedMatches.filter(m => m.matchCategory === category), [sortedMatches, category]);
+                const last10CategoryMatches = useMemo(() => categoryMatches.slice(0, 10), [categoryMatches]);
+                
+                const categoryPlayers = useMemo(() => {
+                    const categoryAge = parseInt(category.replace('U', ''));
+                    if (category === 'U10') {
+                        return players.filter(p => {
+                            if (!p.category) return false;
+                            const playerAge = parseInt(p.category.replace('U', ''));
+                            return playerAge <= categoryAge;
+                        });
+                    } else {
+                        return players.filter(p => p.category === category);
+                    }
+                }, [players, category]);
 
-            const last10Stats = useMemo(() => {
-                const stats = {};
-                players.forEach(p => { stats[p.id] = { name: p.name, goals: 0, assists: 0 }; });
-                last10Matches.forEach(m => {
-                    (m.goals || []).forEach(g => {
-                        if (stats[g.scorerId]) stats[g.scorerId].goals++;
-                        if (stats[g.assistId]) stats[g.assistId].assists++;
+                const teamStats = useMemo(() => {
+                    let wins = 0, losses = 0, draws = 0, goalsFor = 0, goalsAgainst = 0;
+                    last10CategoryMatches.forEach(match => {
+                        if (match.result === '勝利') wins++;
+                        else if (match.result === '敗戦') losses++;
+                        else if (match.result === '引分') draws++;
+                        goalsFor += match.ownScore || 0;
+                        goalsAgainst += match.opponentScore || 0;
                     });
-                });
-                return Object.values(stats);
-            }, [players, last10Matches]);
+                    return { wins, losses, draws, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, last5Matches: last10CategoryMatches.slice(0, 5) };
+                }, [last10CategoryMatches]);
+                
+                const categoryPlayerStats = useMemo(() => {
+                    const stats = {};
+                    categoryPlayers.forEach(p => { 
+                        const totalPlayerStat = playerStats.find(ps => ps.id === p.id);
+                        stats[p.id] = { 
+                            name: p.name, 
+                            recentGoals: 0, 
+                            recentAssists: 0,
+                            totalGoals: totalPlayerStat ? totalPlayerStat.totalGoals : 0,
+                            totalAssists: totalPlayerStat ? totalPlayerStat.totalAssists : 0,
+                        }; 
+                    });
+                    last10CategoryMatches.forEach(m => {
+                        (m.goals || []).forEach(g => {
+                            if (stats[g.scorerId]) stats[g.scorerId].recentGoals++;
+                            if (stats[g.assistId]) stats[g.assistId].recentAssists++;
+                        });
+                    });
+                    return Object.values(stats);
+                }, [categoryPlayers, last10CategoryMatches, playerStats]);
 
-            const last10GoalRanking = [...last10Stats].filter(p => p.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, 5);
-            const last10AssistRanking = [...last10Stats].filter(p => p.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, 5);
-            const totalGoalRanking = [...playerStats].sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
-            const totalAssistRanking = [...playerStats].sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
+                const recentGoalRanking = [...categoryPlayerStats].filter(p => p.recentGoals > 0).sort((a, b) => b.recentGoals - a.recentGoals).slice(0, 5);
+                const recentAssistRanking = [...categoryPlayerStats].filter(p => p.recentAssists > 0).sort((a, b) => b.recentAssists - a.recentAssists).slice(0, 5);
+                const categoryTotalGoalRanking = [...categoryPlayerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
+                const categoryTotalAssistRanking = [...categoryPlayerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
+
+                return (
+                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6">
+                        <h3 className="text-3xl font-bold text-white text-center">{category}</h3>
+                        <div className="bg-gray-900 p-4 rounded-lg">
+                            <h4 className="text-lg font-semibold text-white mb-2 text-center">戦績 (直近10試合)</h4>
+                            {last10CategoryMatches.length > 0 ? (
+                                <>
+                                    <div className="flex justify-around text-center">
+                                        <div><p className="text-2xl font-bold text-green-400">{teamStats.wins}</p><p className="text-xs text-gray-400">勝利</p></div>
+                                        <div><p className="text-2xl font-bold text-red-400">{teamStats.losses}</p><p className="text-xs text-gray-400">敗戦</p></div>
+                                        <div><p className="text-2xl font-bold text-yellow-400">{teamStats.draws}</p><p className="text-xs text-gray-400">引分</p></div>
+                                    </div>
+                                    <div className="flex justify-around text-center pt-3 mt-3 border-t border-gray-700">
+                                        <div><p className="text-2xl font-bold text-sky-400">{teamStats.goalsFor}</p><p className="text-xs text-gray-400">得点</p></div>
+                                        <div><p className="text-2xl font-bold text-orange-400">{teamStats.goalsAgainst}</p><p className="text-xs text-gray-400">失点</p></div>
+                                        <div><p className={`text-2xl font-bold ${teamStats.goalDifference >= 0 ? 'text-green-400' : 'text-red-400'}`}>{teamStats.goalDifference > 0 ? '+' : ''}{teamStats.goalDifference}</p><p className="text-xs text-gray-400">得失点差</p></div>
+                                    </div>
+                                </>
+                            ) : (<p className="text-gray-500 text-center text-sm">記録がありません</p>)}
+                        </div>
+                        <div className="bg-gray-900 p-4 rounded-lg">
+                            <h4 className="text-lg font-semibold mb-2 text-white text-center">最近の試合結果</h4>
+                            {teamStats.last5Matches.length > 0 ? (
+                                <ul className="space-y-2">
+                                    {teamStats.last5Matches.map(match => (
+                                        <li key={match.id} className="flex justify-between items-center text-sm">
+                                            <span>vs {match.opponent}</span>
+                                            <span className="font-bold">{match.ownScore} - {match.opponentScore}
+                                                <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${match.result === '勝利' ? 'bg-green-500 text-white' : match.result === '敗戦' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>
+                                                    {match.result}
+                                                </span>
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (<p className="text-gray-500 text-center text-sm">記録がありません</p>)}
+                        </div>
+                        <RankingCard title="得点 (直近10試合)" ranking={recentGoalRanking} dataKey="recentGoals" unit="点" color="text-red-400" />
+                        <RankingCard title="アシスト (直近10試合)" ranking={recentAssistRanking} dataKey="recentAssists" unit="回" color="text-sky-400" />
+                        <RankingCard title="通算 得点" ranking={categoryTotalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
+                        <RankingCard title="通算 アシスト" ranking={categoryTotalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
+                    </div>
+                );
+            };
 
             return (
                 <div className="space-y-8">
@@ -277,42 +349,15 @@
                         </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-8">
-                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-4">
-                            <h3 className="text-xl font-semibold text-white">戦績サマリー (直近10試合)</h3>
-                            <div className="flex justify-around text-center">
-                                <div><p className="text-3xl font-bold text-green-400">{teamStats.wins}</p><p className="text-sm text-gray-400">勝利</p></div>
-                                <div><p className="text-3xl font-bold text-red-400">{teamStats.losses}</p><p className="text-sm text-gray-400">敗戦</p></div>
-                                <div><p className="text-3xl font-bold text-yellow-400">{teamStats.draws}</p><p className="text-sm text-gray-400">引分</p></div>
-                            </div>
-                            <div className="flex justify-around text-center pt-4 border-t border-gray-700">
-                                <div><p className="text-3xl font-bold text-sky-400">{teamStats.goalsFor}</p><p className="text-sm text-gray-400">総得点</p></div>
-                                <div><p className="text-3xl font-bold text-orange-400">{teamStats.goalsAgainst}</p><p className="text-sm text-gray-400">総失点</p></div>
-                                <div><p className={`text-3xl font-bold ${teamStats.goalDifference >= 0 ? 'text-green-400' : 'text-red-400'}`}>{teamStats.goalDifference > 0 ? '+' : ''}{teamStats.goalDifference}</p><p className="text-sm text-gray-400">得失点差</p></div>
-                            </div>
-                        </div>
-                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
-                            <h3 className="text-xl font-semibold mb-4 text-white">最近の試合結果 (直近5試合)</h3>
-                            <ul className="space-y-3">
-                                {teamStats.last5Matches.map(match => (
-                                    <li key={match.id} className="flex justify-between items-center p-3 bg-gray-900 rounded-md">
-                                        <span>{match.matchCategory && match.matchCategory !== 'All' && `[${match.matchCategory}] `}vs {match.opponent}</span>
-                                        <span className="font-bold">{match.ownScore} - {match.opponentScore}
-                                            <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${match.result === '勝利' ? 'bg-green-500 text-white' : match.result === '敗戦' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>
-                                                {match.result}
-                                            </span>
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <CategoryDashboard category="U12" />
+                        <CategoryDashboard category="U11" />
+                        <CategoryDashboard category="U10" />
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-8">
-                        <RankingCard title="得点ランキング (直近10試合)" ranking={last10GoalRanking} dataKey="goals" unit="点" color="text-red-400" />
-                        <RankingCard title="アシストランキング (直近10試合)" ranking={last10AssistRanking} dataKey="assists" unit="回" color="text-sky-400" />
-                        <RankingCard title="通算 得点ランキング" ranking={totalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
-                        <RankingCard title="通算 アシストランキング" ranking={totalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
+                    <div className="grid md:grid-cols-2 gap-8 pt-8 border-t-2 border-gray-700">
+                        <RankingCard title="全体の通算 得点ランキング" ranking={totalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
+                        <RankingCard title="全体の通算 アシストランキング" ranking={totalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
                     </div>
                 </div>
             );
@@ -321,23 +366,23 @@
         function RankingCard({ title, ranking, dataKey, unit, color }) {
             const rankColors = ['text-yellow-400', 'text-gray-300', 'text-yellow-600'];
             return (
-                <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
-                    <h3 className="text-xl font-semibold mb-4 text-white">{title}</h3>
+                <div className="bg-gray-900 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold mb-3 text-white text-center">{title}</h3>
                     {ranking.length > 0 ? (
-                        <ol className="space-y-3">
+                        <ol className="space-y-2">
                             {ranking.map((player, index) => (
-                                <li key={player.id || player.name} className="flex items-center justify-between p-3 bg-gray-900 rounded-md">
+                                <li key={player.id || player.name} className="flex items-center justify-between p-2 bg-gray-800 rounded-md text-sm">
                                     <div className="flex items-center">
-                                        <span className={`text-lg font-bold w-8 ${rankColors[index] || 'text-gray-500'}`}>
+                                        <span className={`font-bold w-7 ${rankColors[index] || 'text-gray-500'}`}>
                                             {index + 1}.
                                         </span>
                                         <span className="font-medium">{player.name}</span>
                                     </div>
-                                    <span className={`font-bold text-lg ${color}`}>{player[dataKey]} {unit}</span>
+                                    <span className={`font-bold ${color}`}>{player[dataKey]} {unit}</span>
                                 </li>
                             ))}
                         </ol>
-                    ) : (<p className="text-gray-500">まだ記録がありません。</p>)}
+                    ) : (<p className="text-gray-500 text-center text-sm">記録がありません</p>)}
                 </div>
             );
         }
@@ -542,7 +587,7 @@
 
             useEffect(() => {
                 if (existingMatch) {
-                    setMatch(prev => ({ ...prev, ...existingMatch }));
+                    setMatch(prev => ({ ...initialMatchState, ...existingMatch }));
                 } else {
                     setMatch(initialMatchState);
                 }
