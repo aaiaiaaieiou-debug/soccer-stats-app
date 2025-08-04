@@ -396,8 +396,8 @@
                             valA = a.category ? parseInt(a.category.replace('U', '')) : 0;
                             valB = b.category ? parseInt(b.category.replace('U', '')) : 0;
                         } else {
-                            valA = a[sortConfig.key] ?? 0;
-                            valB = b[sortConfig.key] ?? 0;
+                            valA = a[sortConfig.key] || 0;
+                            valB = b[sortConfig.key] || 0;
                         }
 
                         if (valA < valB) {
