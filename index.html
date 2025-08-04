@@ -536,10 +536,17 @@
         }
         
         function MatchForm({ navigate, players, existingMatch }) {
-            const [match, setMatch] = useState({ date: '', matchType: 'TRM', opponent: '', venue: '', format: '8人制', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'All' });
+            const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '8人制', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'All' };
+            const [match, setMatch] = useState(initialMatchState);
             const categories = ['All', 'U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
 
-            useEffect(() => { if (existingMatch) setMatch(existingMatch); }, [existingMatch]);
+            useEffect(() => {
+                if (existingMatch) {
+                    setMatch(prev => ({ ...prev, ...existingMatch }));
+                } else {
+                    setMatch(initialMatchState);
+                }
+            }, [existingMatch]);
             
             const filteredPlayers = useMemo(() => {
                 if (match.matchCategory === 'All') return players;
