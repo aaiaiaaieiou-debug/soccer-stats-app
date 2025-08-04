@@ -365,22 +365,30 @@
 
         function RankingCard({ title, ranking, dataKey, unit, color }) {
             const rankColors = ['text-yellow-400', 'text-gray-300', 'text-yellow-600'];
+            let lastScore = -1;
+            let currentRank = 0;
             return (
                 <div className="bg-gray-900 p-4 rounded-lg">
                     <h3 className="text-lg font-semibold mb-3 text-white text-center">{title}</h3>
                     {ranking.length > 0 ? (
                         <ol className="space-y-2">
-                            {ranking.map((player, index) => (
-                                <li key={player.id || player.name} className="flex items-center justify-between p-2 bg-gray-800 rounded-md text-sm">
-                                    <div className="flex items-center">
-                                        <span className={`font-bold w-7 ${rankColors[index] || 'text-gray-500'}`}>
-                                            {index + 1}.
-                                        </span>
-                                        <span className="font-medium">{player.name}</span>
-                                    </div>
-                                    <span className={`font-bold ${color}`}>{player[dataKey]} {unit}</span>
-                                </li>
-                            ))}
+                            {ranking.map((player, index) => {
+                                if (player[dataKey] !== lastScore) {
+                                    currentRank = index + 1;
+                                    lastScore = player[dataKey];
+                                }
+                                return (
+                                    <li key={player.id || player.name} className="flex items-center justify-between p-2 bg-gray-800 rounded-md text-sm">
+                                        <div className="flex items-center">
+                                            <span className={`font-bold w-7 ${rankColors[currentRank - 1] || 'text-gray-500'}`}>
+                                                {currentRank}.
+                                            </span>
+                                            <span className="font-medium">{player.name}</span>
+                                        </div>
+                                        <span className={`font-bold ${color}`}>{player[dataKey]} {unit}</span>
+                                    </li>
+                                );
+                            })}
                         </ol>
                     ) : (<p className="text-gray-500 text-center text-sm">記録がありません</p>)}
                 </div>
