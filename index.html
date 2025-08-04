@@ -491,8 +491,18 @@
             const addCard = (type) => setMatch(prev => ({ ...prev, [type]: [...(prev[type] || []), { playerId: '' }] }));
             const handleCardChange = (type, index, value) => setMatch(prev => { const newCards = [...prev[type]]; newCards[index].playerId = value; return { ...prev, [type]: newCards }; });
             const removeCard = (type, index) => setMatch(prev => ({ ...prev, [type]: prev[type].filter((_, i) => i !== index) }));
+            
             const handleSubmit = async (e) => {
                 e.preventDefault();
+                
+                const starterLimits = { '8人制': 8, '11人制': 11, 'フットサル': 5 };
+                const requiredStarters = starterLimits[match.format];
+                
+                if (requiredStarters && (match.starters || []).length !== requiredStarters) {
+                    alert(`${match.format}の試合では、先発選手を${requiredStarters}人選択してください。`);
+                    return;
+                }
+
                 const path = `artifacts/${appId}/public/data/matches`;
                 const data = { ...match, ownScore: parseInt(match.ownScore, 10) || 0, opponentScore: parseInt(match.opponentScore, 10) || 0 };
                 try {
@@ -502,6 +512,7 @@
                     navigate('match-list');
                 } catch (error) { console.error("Error saving document: ", error); alert("保存中にエラーが発生しました。"); }
             };
+
             const participatingPlayers = [...(match.starters || []), ...(match.subs || [])].map(id => players.find(p => p.id === id)).filter(Boolean);
             return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6"><InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required /><SelectField label="試合形式" name="matchType" value={match.matchType} onChange={handleChange} options={['TRM', '公式戦', 'カップ戦', 'その他']} />{(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}<InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required /><InputField label="会場" name="venue" value={match.venue} onChange={handleChange} placeholder="例：〇〇グラウンド" /><SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['8人制', '11人制', 'フットサル', 'その他']} /><SelectField label="天気" name="weather" value={match.weather} onChange={handleChange} options={['晴れ', '曇り', '雨', '雪']} /><SelectField label="結果" name="result" value={match.result} onChange={handleChange} options={['勝利', '敗戦', '引分']} /><InputField label="自チーム得点" type="number" name="ownScore" value={match.ownScore} onChange={handleChange} /><InputField label="相手チーム得点" type="number" name="opponentScore" value={match.opponentScore} onChange={handleChange} /></div></FormSection>
             <FormSection title="出場選手">
