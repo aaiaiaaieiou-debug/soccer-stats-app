@@ -327,9 +327,9 @@
                 const categoryTotalAssistRanking = [...categoryPlayerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
 
                 return (
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6">
+                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6 flex flex-col">
                         <h3 className="text-3xl font-bold text-white text-center">{category}</h3>
-                        <div className="bg-gray-900 p-4 rounded-lg">
+                        <div className="bg-gray-900 p-4 rounded-lg min-h-[160px]">
                             <h4 className="text-lg font-semibold text-white mb-2 text-center">戦績 (直近10試合)</h4>
                             {last10CategoryMatches.length > 0 ? (
                                 <>
@@ -344,9 +344,9 @@
                                         <div><p className={`text-2xl font-bold ${teamStats.goalDifference >= 0 ? 'text-green-400' : 'text-red-400'}`}>{teamStats.goalDifference > 0 ? '+' : ''}{teamStats.goalDifference}</p><p className="text-xs text-gray-400">得失点差</p></div>
                                     </div>
                                 </>
-                            ) : (<p className="text-gray-500 text-center text-sm">記録がありません</p>)}
+                            ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
                         </div>
-                        <div className="bg-gray-900 p-4 rounded-lg">
+                        <div className="bg-gray-900 p-4 rounded-lg min-h-[190px]">
                             <h4 className="text-lg font-semibold mb-2 text-white text-center">最近の試合結果</h4>
                             {teamStats.last5Matches.length > 0 ? (
                                 <ul className="space-y-2">
@@ -361,7 +361,7 @@
                                         </li>
                                     ))}
                                 </ul>
-                            ) : (<p className="text-gray-500 text-center text-sm">記録がありません</p>)}
+                            ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
                         </div>
                         <RankingCard title="得点 (直近10試合)" ranking={recentGoalRanking} dataKey="recentGoals" unit="点" color="text-red-400" />
                         <RankingCard title="アシスト (直近10試合)" ranking={recentAssistRanking} dataKey="recentAssists" unit="回" color="text-sky-400" />
