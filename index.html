@@ -500,17 +500,46 @@
         }
 
         function MatchList({ navigate, matches, players, isEditMode }) {
+            const [categoryFilter, setCategoryFilter] = useState('All');
+            const categories = ['All', 'U12', 'U11', 'U10'];
+
             const getPlayerName = (id) => players.find(p => p.id === id)?.name || '不明';
-            const sortedMatches = [...matches].sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
+            
+            const filteredMatches = useMemo(() => {
+                if(categoryFilter === 'All') return sortedMatches;
+                return sortedMatches.filter(match => match.matchCategory === categoryFilter);
+            }, [sortedMatches, categoryFilter]);
+
             const handleDelete = async (id) => {
                 try { await db.collection(`artifacts/${appId}/public/data/matches`).doc(id).delete(); } 
                 catch (error) { console.error("Error deleting match: ", error); alert("試合記録の削除中にエラーが発生しました。"); }
             };
             return (
                 <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
-                    <h2 className="text-2xl font-semibold p-6 text-white">試合一覧</h2>
+                    <div className="p-6">
+                        <h2 className="text-2xl font-semibold text-white">試合一覧</h2>
+                        <div className="mt-4 border-b border-gray-700">
+                            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                                {categories.map(cat => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => setCategoryFilter(cat)}
+                                        className={`${
+                                            categoryFilter === cat
+                                                ? 'border-sky-500 text-sky-400'
+                                                : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
+                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                    </div>
                     <div className="space-y-4 p-6 pt-0">
-                        {sortedMatches.map(match => (
+                        {filteredMatches.map(match => (
                             <details key={match.id} className="bg-gray-900 p-4 rounded-lg border border-gray-700">
                                 <summary className="font-semibold cursor-pointer flex justify-between items-center">
                                     <div className="flex-grow">
