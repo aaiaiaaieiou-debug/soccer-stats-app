@@ -191,26 +191,59 @@
 
         function Header({ navigate, isEditMode, onEditModeToggle, onLogout }) {
             const emblemUrl = "https://i.imgur.com/h4W4M2S.jpeg";
+            const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+            const handleNavigate = (page) => {
+                navigate(page);
+                setIsMenuOpen(false);
+            };
+            
             return (
                 <header className="bg-gray-800 shadow-lg sticky top-0 z-40">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between items-center h-20">
-                            <div className="flex items-center cursor-pointer" onClick={() => navigate('dashboard')}>
-                                {emblemUrl ? <img src={emblemUrl} alt="チームエンブレム" className="h-14 w-auto mr-4"/> : <TeamEmblemPlaceholder />}
-                                <h1 className="text-2xl font-bold text-white tracking-wider">FURUGEN MINAMI FC</h1>
+                            <div className="flex items-center cursor-pointer" onClick={() => handleNavigate('dashboard')}>
+                                {emblemUrl ? <img src={emblemUrl} alt="チームエンブレム" className="h-14 w-auto mr-2 md:mr-4"/> : <TeamEmblemPlaceholder />}
+                                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-wider">FURUGEN MINAMI FC</h1>
                             </div>
-                            <nav className="flex items-center space-x-2">
-                                <button onClick={() => navigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
-                                <button onClick={() => navigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
-                                {isEditMode && <button onClick={() => navigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
+                            {/* Desktop Menu */}
+                            <nav className="hidden md:flex items-center space-x-2">
+                                <button onClick={() => handleNavigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
+                                <button onClick={() => handleNavigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
+                                {isEditMode && <button onClick={() => handleNavigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
                                 {isEditMode ? (
                                     <button onClick={onLogout} className="flex items-center bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition-colors shadow-md"><IconUnlock className="mr-2"/>閲覧モード</button>
                                 ) : (
                                     <button onClick={onEditModeToggle} className="flex items-center bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors shadow-md"><IconLock className="mr-2"/>編集モード</button>
                                 )}
                             </nav>
+                             {/* Mobile Menu Button */}
+                            <div className="md:hidden">
+                                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-300 hover:text-white focus:outline-none p-2">
+                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
+                     {/* Mobile Menu */}
+                    {isMenuOpen && (
+                        <div className="md:hidden">
+                            <nav className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                                <button onClick={() => handleNavigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
+                                <button onClick={() => handleNavigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
+                                {isEditMode && <button onClick={() => handleNavigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
+                                <div className="pt-2">
+                                  {isEditMode ? (
+                                      <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="flex items-center w-full text-left bg-red-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-red-600 transition-colors shadow-md"><IconUnlock className="mr-2"/>閲覧モード</button>
+                                  ) : (
+                                      <button onClick={() => { onEditModeToggle(); setIsMenuOpen(false); }} className="flex items-center w-full text-left bg-sky-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-sky-600 transition-colors shadow-md"><IconLock className="mr-2"/>編集モード</button>
+                                  )}
+                                </div>
+                            </nav>
+                        </div>
+                    )}
                 </header>
             );
         }
