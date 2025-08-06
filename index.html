@@ -97,6 +97,7 @@
             const [editingMatch, setEditingMatch] = useState(null);
             const [isEditMode, setIsEditMode] = useState(false);
             const [showPasswordModal, setShowPasswordModal] = useState(false);
+            const [selectedPlayer, setSelectedPlayer] = useState(null);
 
             useEffect(() => {
                 if (!auth) return;
@@ -168,13 +169,13 @@
             
             const renderPage = () => {
                 switch (page) {
-                    case 'dashboard': return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode} />;
+                    case 'dashboard': return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
                     case 'match-list': return <MatchList navigate={navigate} matches={matches} players={players} isEditMode={isEditMode} />;
                     case 'player-management': return <PlayerManagement players={players} />;
                     case 'add-match': return <MatchForm navigate={navigate} players={players} />;
                     case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
-                    case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} />;
-                    default: return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode}/>;
+                    case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
+                    default: return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
                 }
             };
 
@@ -185,6 +186,7 @@
                     <Header navigate={navigate} isEditMode={isEditMode} onEditModeToggle={() => setShowPasswordModal(true)} onLogout={logout} />
                     <main className="p-4 sm:p-8">{renderPage()}</main>
                     {showPasswordModal && <PasswordModal onSubmit={handlePasswordSubmit} onClose={() => setShowPasswordModal(false)} />}
+                    {selectedPlayer && <PlayerDetailModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
                 </div>
             );
         }
@@ -265,7 +267,7 @@
             );
         }
 
-        function Dashboard({ navigate, playerStats, matches, players, isEditMode }) {
+        function Dashboard({ navigate, playerStats, matches, players, isEditMode, onPlayerSelect }) {
             const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
             
             const totalGoalRanking = [...playerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
@@ -305,7 +307,7 @@
                     categoryPlayers.forEach(p => { 
                         const totalPlayerStat = playerStats.find(ps => ps.id === p.id);
                         stats[p.id] = { 
-                            name: p.name, 
+                            ...p,
                             recentGoals: 0, 
                             recentAssists: 0,
                             totalGoals: totalPlayerStat ? totalPlayerStat.totalGoals : 0,
@@ -363,10 +365,10 @@
                                 </ul>
                             ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
                         </div>
-                        <RankingCard title="得点 (直近10試合)" ranking={recentGoalRanking} dataKey="recentGoals" unit="点" color="text-red-400" />
-                        <RankingCard title="アシスト (直近10試合)" ranking={recentAssistRanking} dataKey="recentAssists" unit="回" color="text-sky-400" />
-                        <RankingCard title="通算 得点" ranking={categoryTotalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
-                        <RankingCard title="通算 アシスト" ranking={categoryTotalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
+                        <RankingCard title="得点 (直近10試合)" ranking={recentGoalRanking} dataKey="recentGoals" unit="点" color="text-red-400" onPlayerSelect={onPlayerSelect} />
+                        <RankingCard title="アシスト (直近10試合)" ranking={recentAssistRanking} dataKey="recentAssists" unit="回" color="text-sky-400" onPlayerSelect={onPlayerSelect} />
+                        <RankingCard title="通算 得点" ranking={categoryTotalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" onPlayerSelect={onPlayerSelect} />
+                        <RankingCard title="通算 アシスト" ranking={categoryTotalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" onPlayerSelect={onPlayerSelect} />
                     </div>
                 );
             };
@@ -389,14 +391,14 @@
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-8 pt-8 border-t-2 border-gray-700">
-                        <RankingCard title="全体の通算 得点ランキング" ranking={totalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
-                        <RankingCard title="全体の通算 アシストランキング" ranking={totalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
+                        <RankingCard title="全体の通算 得点ランキング" ranking={totalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" onPlayerSelect={onPlayerSelect} />
+                        <RankingCard title="全体の通算 アシストランキング" ranking={totalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" onPlayerSelect={onPlayerSelect} />
                     </div>
                 </div>
             );
         }
 
-        function RankingCard({ title, ranking, dataKey, unit, color }) {
+        function RankingCard({ title, ranking, dataKey, unit, color, onPlayerSelect }) {
             const rankColors = ['text-yellow-400', 'text-gray-300', 'text-yellow-600'];
             let lastScore = -1;
             let currentRank = 0;
@@ -416,7 +418,7 @@
                                             <span className={`font-bold w-7 ${rankColors[currentRank - 1] || 'text-gray-500'}`}>
                                                 {currentRank}.
                                             </span>
-                                            <span className="font-medium">{player.name}</span>
+                                            <button onClick={() => onPlayerSelect(player)} className="font-medium hover:underline">{player.name}</button>
                                         </div>
                                         <span className={`font-bold ${color}`}>{player[dataKey]} {unit}</span>
                                     </li>
@@ -432,6 +434,7 @@
             const [name, setName] = useState('');
             const [number, setNumber] = useState('');
             const [category, setCategory] = useState('U12');
+            const [photoUrl, setPhotoUrl] = useState('');
             const [editingPlayer, setEditingPlayer] = useState(null);
             const categories = ['U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
 
@@ -439,7 +442,7 @@
                 e.preventDefault();
                 if (!name || !number || !category) { alert("カテゴリー、選手名、背番号を入力してください。"); return; }
                 const playersCollectionPath = `artifacts/${appId}/public/data/players`;
-                const playerData = { name, number: parseInt(number, 10), category };
+                const playerData = { name, number: parseInt(number, 10), category, photoUrl };
                 if (editingPlayer) {
                     await db.collection(playersCollectionPath).doc(editingPlayer.id).update(playerData);
                     setEditingPlayer(null);
@@ -447,7 +450,7 @@
                     playerData.baseStats = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
                     await db.collection(playersCollectionPath).add(playerData);
                 }
-                setName(''); setNumber(''); setCategory('U12');
+                setName(''); setNumber(''); setCategory('U12'); setPhotoUrl('');
             };
 
             const handleEdit = (player) => { 
@@ -455,6 +458,7 @@
                 setName(player.name); 
                 setNumber(player.number); 
                 setCategory(player.category || 'U12');
+                setPhotoUrl(player.photoUrl || '');
             };
             const handleDelete = async (id) => {
                 try { await db.collection(`artifacts/${appId}/public/data/players`).doc(id).delete(); } 
@@ -467,7 +471,7 @@
                 <div className="max-w-5xl mx-auto">
                     <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 mb-8">
                         <h2 className="text-2xl font-semibold mb-4">{editingPlayer ? '選手情報を編集' : '新しい選手を追加'}</h2>
-                        <form onSubmit={handleSubmit} className="grid sm:grid-cols-4 gap-4 items-end">
+                        <form onSubmit={handleSubmit} className="grid sm:grid-cols-5 gap-4 items-end">
                             <div><label htmlFor="playerCategory" className="block text-sm font-medium text-gray-400">カテゴリー</label>
                                 <select id="playerCategory" value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">
                                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -475,9 +479,10 @@
                             </div>
                             <div><label htmlFor="playerName" className="block text-sm font-medium text-gray-400">選手名</label><input type="text" id="playerName" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：山田 太郎" /></div>
                             <div><label htmlFor="playerNumber" className="block text-sm font-medium text-gray-400">背番号</label><input type="number" id="playerNumber" value={number} onChange={(e) => setNumber(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：10" /></div>
+                            <div><label htmlFor="photoUrl" className="block text-sm font-medium text-gray-400">写真URL</label><input type="text" id="photoUrl" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="https://..." /></div>
                             <div className="flex space-x-2">
                                  <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">{editingPlayer ? '更新' : '追加'}</button>
-                                 {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); setCategory('U12'); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
+                                 {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); setCategory('U12'); setPhotoUrl(''); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
                             </div>
                         </form>
                     </div>
@@ -571,7 +576,7 @@
             );
         }
 
-        function PlayerStatsList({ playerStats, isEditMode }) {
+        function PlayerStatsList({ playerStats, isEditMode, onPlayerSelect }) {
             const [sortConfig, setSortConfig] = useState({ key: 'category', direction: 'descending' });
             const [editingPlayer, setEditingPlayer] = useState(null);
             
@@ -638,7 +643,7 @@
                                     {columns.map(col => <td key={col.key} className={`px-6 py-4 ${col.key === 'name' ? 'font-bold' : ''}`}>
                                         {col.key === 'actions' ? 
                                             <button onClick={() => setEditingPlayer(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button> :
-                                            player[col.key]
+                                            (col.key === 'name' ? <button onClick={() => onPlayerSelect(player)} className="hover:underline">{player.name}</button> : player[col.key])
                                         }
                                     </td>)}
                                 </tr>
@@ -787,6 +792,48 @@
             const handleSubmit = (e) => { e.preventDefault(); onSave(player.id, stats); };
             const fields = [{ label: '出場試合数', name: 'matchesPlayed' }, { label: '得点', name: 'goals' }, { label: 'アシスト', name: 'assists' }, { label: '警告', name: 'cautions' }, { label: '退場', name: 'ejections' }];
             return (<div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50"><div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-md m-4"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-white">{player.name} の基礎記録を編集</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div><p className="text-sm text-gray-400 mb-6">ここでの入力は、アプリで記録された成績に加算される基礎値となります。</p><form onSubmit={handleSubmit}><div className="grid grid-cols-2 gap-4">{fields.map(f => (<div key={f.name}><label className="block text-sm font-medium text-gray-400">{f.label}</label><input type="number" name={f.name} value={stats[f.name]} onChange={handleChange} className="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3" /></div>))}</div><div className="mt-8 flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">保存</button></div></form></div></div>);
+        }
+
+        function PlayerDetailModal({ player, onClose }) {
+            if (!player) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl w-full max-w-sm m-4 text-white overflow-hidden">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-2xl font-bold">{player.name}</h3>
+                                <button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button>
+                            </div>
+                            <div className="flex justify-center mb-6">
+                                {player.photoUrl ? (
+                                    <img src={player.photoUrl} alt={player.name} className="w-32 h-32 rounded-full object-cover border-4 border-gray-700" />
+                                ) : (
+                                    <div className="w-32 h-32 rounded-full bg-gray-700 flex items-center justify-center border-4 border-gray-600">
+                                        <svg className="w-20 h-20 text-gray-500" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div>
+                                    <p className="text-2xl font-bold">{player.totalMatchesPlayed}</p>
+                                    <p className="text-sm text-gray-400">出場試合</p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">{player.totalGoals}</p>
+                                    <p className="text-sm text-gray-400">得点</p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">{player.totalAssists}</p>
+                                    <p className="text-sm text-gray-400">アシスト</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-gray-900 px-6 py-4">
+                            <button onClick={onClose} className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">CLOSE</button>
+                        </div>
+                    </div>
+                </div>
+            );
         }
 
         ReactDOM.render(<App />, document.getElementById('root'));
