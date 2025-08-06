@@ -171,13 +171,14 @@
             
             const renderPage = () => {
                 switch (page) {
-                    case 'dashboard': return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
+                    case 'dashboard': return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode} />;
+                    case 'rankings': return <RankingsPage playerStats={playerStats} matches={matches} players={players} onPlayerSelect={setSelectedPlayer} />;
                     case 'match-list': return <MatchList navigate={navigate} matches={matches} players={players} isEditMode={isEditMode} />;
                     case 'player-management': return <PlayerManagement players={players} storage={storage} />;
                     case 'add-match': return <MatchForm navigate={navigate} players={players} />;
                     case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
                     case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
-                    default: return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
+                    default: return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode}/>;
                 }
             };
 
@@ -213,6 +214,7 @@
                             {/* Desktop Menu */}
                             <nav className="hidden sm:flex items-center space-x-2">
                                 <button onClick={() => handleNavigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
+                                <button onClick={() => handleNavigate('rankings')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ランキング</button>
                                 <button onClick={() => handleNavigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
                                 {isEditMode && <button onClick={() => handleNavigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
                                 {isEditMode ? (
@@ -236,6 +238,7 @@
                         <div className="sm:hidden">
                             <nav className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                                 <button onClick={() => handleNavigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
+                                <button onClick={() => handleNavigate('rankings')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">ランキング</button>
                                 <button onClick={() => handleNavigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
                                 {isEditMode && <button onClick={() => handleNavigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
                                 <div className="pt-2">
@@ -269,29 +272,13 @@
             );
         }
 
-        function Dashboard({ navigate, playerStats, matches, players, isEditMode, onPlayerSelect }) {
+        function Dashboard({ navigate, matches, isEditMode }) {
             const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
             
-            const totalGoalRanking = [...playerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
-            const totalAssistRanking = [...playerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
-
             const CategoryDashboard = ({ category }) => {
                 const categoryMatches = useMemo(() => sortedMatches.filter(m => m.matchCategory === category), [sortedMatches, category]);
                 const last10CategoryMatches = useMemo(() => categoryMatches.slice(0, 10), [categoryMatches]);
                 
-                const categoryPlayers = useMemo(() => {
-                    const categoryAge = parseInt(category.replace('U', ''));
-                    if (category === 'U10') {
-                        return players.filter(p => {
-                            if (!p.category) return false;
-                            const playerAge = parseInt(p.category.replace('U', ''));
-                            return playerAge <= categoryAge;
-                        });
-                    } else {
-                        return players.filter(p => p.category === category);
-                    }
-                }, [players, category]);
-
                 const teamStats = useMemo(() => {
                     let wins = 0, losses = 0, draws = 0, goalsFor = 0, goalsAgainst = 0;
                     last10CategoryMatches.forEach(match => {
@@ -304,32 +291,6 @@
                     return { wins, losses, draws, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, last5Matches: last10CategoryMatches.slice(0, 5) };
                 }, [last10CategoryMatches]);
                 
-                const categoryPlayerStats = useMemo(() => {
-                    const stats = {};
-                    categoryPlayers.forEach(p => { 
-                        const totalPlayerStat = playerStats.find(ps => ps.id === p.id);
-                        stats[p.id] = { 
-                            ...p,
-                            recentGoals: 0, 
-                            recentAssists: 0,
-                            totalGoals: totalPlayerStat ? totalPlayerStat.totalGoals : 0,
-                            totalAssists: totalPlayerStat ? totalPlayerStat.totalAssists : 0,
-                        }; 
-                    });
-                    last10CategoryMatches.forEach(m => {
-                        (m.goals || []).forEach(g => {
-                            if (stats[g.scorerId]) stats[g.scorerId].recentGoals++;
-                            if (stats[g.assistId]) stats[g.assistId].recentAssists++;
-                        });
-                    });
-                    return Object.values(stats);
-                }, [categoryPlayers, last10CategoryMatches, playerStats]);
-
-                const recentGoalRanking = [...categoryPlayerStats].filter(p => p.recentGoals > 0).sort((a, b) => b.recentGoals - a.recentGoals).slice(0, 5);
-                const recentAssistRanking = [...categoryPlayerStats].filter(p => p.recentAssists > 0).sort((a, b) => b.recentAssists - a.recentAssists).slice(0, 5);
-                const categoryTotalGoalRanking = [...categoryPlayerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
-                const categoryTotalAssistRanking = [...categoryPlayerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
-
                 return (
                     <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6 flex flex-col">
                         <h3 className="text-3xl font-bold text-white text-center">{category}</h3>
@@ -367,10 +328,6 @@
                                 </ul>
                             ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
                         </div>
-                        <RankingCard title="得点 (直近10試合)" ranking={recentGoalRanking} dataKey="recentGoals" unit="点" color="text-red-400" onPlayerSelect={onPlayerSelect} />
-                        <RankingCard title="アシスト (直近10試合)" ranking={recentAssistRanking} dataKey="recentAssists" unit="回" color="text-sky-400" onPlayerSelect={onPlayerSelect} />
-                        <RankingCard title="通算 得点" ranking={categoryTotalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" onPlayerSelect={onPlayerSelect} />
-                        <RankingCard title="通算 アシスト" ranking={categoryTotalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" onPlayerSelect={onPlayerSelect} />
                     </div>
                 );
             };
@@ -391,13 +348,84 @@
                         <CategoryDashboard category="U11" />
                         <CategoryDashboard category="U10" />
                     </div>
+                </div>
+            );
+        }
 
+        function RankingsPage({ playerStats, matches, players, onPlayerSelect }) {
+            const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
+            
+            const totalGoalRanking = [...playerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
+            const totalAssistRanking = [...playerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
+
+            const CategoryRankings = ({ category }) => {
+                const categoryMatches = useMemo(() => sortedMatches.filter(m => m.matchCategory === category), [sortedMatches, category]);
+                const last10CategoryMatches = useMemo(() => categoryMatches.slice(0, 10), [categoryMatches]);
+                
+                const categoryPlayers = useMemo(() => {
+                    const categoryAge = parseInt(category.replace('U', ''));
+                    if (category === 'U10') {
+                        return players.filter(p => {
+                            if (!p.category) return false;
+                            const playerAge = parseInt(p.category.replace('U', ''));
+                            return playerAge <= categoryAge;
+                        });
+                    } else {
+                        return players.filter(p => p.category === category);
+                    }
+                }, [players, category]);
+                
+                const categoryPlayerStats = useMemo(() => {
+                    const stats = {};
+                    categoryPlayers.forEach(p => { 
+                        const totalPlayerStat = playerStats.find(ps => ps.id === p.id);
+                        stats[p.id] = { 
+                            ...p,
+                            recentGoals: 0, 
+                            recentAssists: 0,
+                            totalGoals: totalPlayerStat ? totalPlayerStat.totalGoals : 0,
+                            totalAssists: totalPlayerStat ? totalPlayerStat.totalAssists : 0,
+                        }; 
+                    });
+                    last10CategoryMatches.forEach(m => {
+                        (m.goals || []).forEach(g => {
+                            if (stats[g.scorerId]) stats[g.scorerId].recentGoals++;
+                            if (stats[g.assistId]) stats[g.assistId].recentAssists++;
+                        });
+                    });
+                    return Object.values(stats);
+                }, [categoryPlayers, last10CategoryMatches, playerStats]);
+
+                const recentGoalRanking = [...categoryPlayerStats].filter(p => p.recentGoals > 0).sort((a, b) => b.recentGoals - a.recentGoals).slice(0, 5);
+                const recentAssistRanking = [...categoryPlayerStats].filter(p => p.recentAssists > 0).sort((a, b) => b.recentAssists - a.recentAssists).slice(0, 5);
+                const categoryTotalGoalRanking = [...categoryPlayerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
+                const categoryTotalAssistRanking = [...categoryPlayerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
+
+                return (
+                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6 flex flex-col">
+                        <h3 className="text-3xl font-bold text-white text-center">{category}</h3>
+                        <RankingCard title="得点 (直近10試合)" ranking={recentGoalRanking} dataKey="recentGoals" unit="点" color="text-red-400" onPlayerSelect={onPlayerSelect} />
+                        <RankingCard title="アシスト (直近10試合)" ranking={recentAssistRanking} dataKey="recentAssists" unit="回" color="text-sky-400" onPlayerSelect={onPlayerSelect} />
+                        <RankingCard title="通算 得点" ranking={categoryTotalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" onPlayerSelect={onPlayerSelect} />
+                        <RankingCard title="通算 アシスト" ranking={categoryTotalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" onPlayerSelect={onPlayerSelect} />
+                    </div>
+                );
+            };
+
+            return (
+                 <div className="space-y-8">
+                    <h2 className="text-3xl font-bold text-white mb-4 text-center">ランキング</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <CategoryRankings category="U12" />
+                        <CategoryRankings category="U11" />
+                        <CategoryRankings category="U10" />
+                    </div>
                     <div className="grid md:grid-cols-2 gap-8 pt-8 border-t-2 border-gray-700">
                         <RankingCard title="全体の通算 得点ランキング" ranking={totalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" onPlayerSelect={onPlayerSelect} />
                         <RankingCard title="全体の通算 アシストランキング" ranking={totalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" onPlayerSelect={onPlayerSelect} />
                     </div>
                 </div>
-            );
+            )
         }
 
         function RankingCard({ title, ranking, dataKey, unit, color, onPlayerSelect }) {
