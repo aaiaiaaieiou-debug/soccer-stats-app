@@ -20,6 +20,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
 
     <style>
         body {
@@ -58,11 +59,12 @@
         };
         const appId = firebaseConfig.projectId;
 
-        let app, db, auth;
+        let app, db, auth, storage;
         try {
             app = firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
             auth = firebase.auth();
+            storage = firebase.storage();
         } catch (e) {
             console.error("Firebase initialization error:", e);
             document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。";
@@ -171,7 +173,7 @@
                 switch (page) {
                     case 'dashboard': return <Dashboard navigate={navigate} playerStats={playerStats} matches={matches} players={players} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
                     case 'match-list': return <MatchList navigate={navigate} matches={matches} players={players} isEditMode={isEditMode} />;
-                    case 'player-management': return <PlayerManagement players={players} />;
+                    case 'player-management': return <PlayerManagement players={players} storage={storage} />;
                     case 'add-match': return <MatchForm navigate={navigate} players={players} />;
                     case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
                     case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
@@ -430,19 +432,34 @@
             );
         }
 
-        function PlayerManagement({ players }) {
+        function PlayerManagement({ players, storage }) {
             const [name, setName] = useState('');
             const [number, setNumber] = useState('');
             const [category, setCategory] = useState('U12');
-            const [photoUrl, setPhotoUrl] = useState('');
+            const [photoFile, setPhotoFile] = useState(null);
             const [editingPlayer, setEditingPlayer] = useState(null);
             const categories = ['U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
+
+            const handleFileChange = (e) => {
+                if (e.target.files[0]) {
+                    setPhotoFile(e.target.files[0]);
+                }
+            };
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (!name || !number || !category) { alert("カテゴリー、選手名、背番号を入力してください。"); return; }
+                
+                let uploadedPhotoUrl = editingPlayer ? editingPlayer.photoUrl : '';
+                if (photoFile) {
+                    const storageRef = storage.ref(`player_photos/${appId}/${photoFile.name}`);
+                    await storageRef.put(photoFile);
+                    uploadedPhotoUrl = await storageRef.getDownloadURL();
+                }
+
                 const playersCollectionPath = `artifacts/${appId}/public/data/players`;
-                const playerData = { name, number: parseInt(number, 10), category, photoUrl };
+                const playerData = { name, number: parseInt(number, 10), category, photoUrl: uploadedPhotoUrl };
+                
                 if (editingPlayer) {
                     await db.collection(playersCollectionPath).doc(editingPlayer.id).update(playerData);
                     setEditingPlayer(null);
@@ -450,7 +467,7 @@
                     playerData.baseStats = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
                     await db.collection(playersCollectionPath).add(playerData);
                 }
-                setName(''); setNumber(''); setCategory('U12'); setPhotoUrl('');
+                setName(''); setNumber(''); setCategory('U12'); setPhotoFile(null);
             };
 
             const handleEdit = (player) => { 
@@ -458,7 +475,7 @@
                 setName(player.name); 
                 setNumber(player.number); 
                 setCategory(player.category || 'U12');
-                setPhotoUrl(player.photoUrl || '');
+                setPhotoFile(null);
             };
             const handleDelete = async (id) => {
                 try { await db.collection(`artifacts/${appId}/public/data/players`).doc(id).delete(); } 
@@ -479,10 +496,10 @@
                             </div>
                             <div><label htmlFor="playerName" className="block text-sm font-medium text-gray-400">選手名</label><input type="text" id="playerName" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：山田 太郎" /></div>
                             <div><label htmlFor="playerNumber" className="block text-sm font-medium text-gray-400">背番号</label><input type="number" id="playerNumber" value={number} onChange={(e) => setNumber(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：10" /></div>
-                            <div><label htmlFor="photoUrl" className="block text-sm font-medium text-gray-400">写真URL</label><input type="text" id="photoUrl" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="https://..." /></div>
+                            <div><label htmlFor="photoFile" className="block text-sm font-medium text-gray-400">写真</label><input type="file" id="photoFile" onChange={handleFileChange} className="mt-1 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-500 file:text-white hover:file:bg-sky-600"/></div>
                             <div className="flex space-x-2">
                                  <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">{editingPlayer ? '更新' : '追加'}</button>
-                                 {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); setCategory('U12'); setPhotoUrl(''); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
+                                 {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); setCategory('U12'); setPhotoFile(null); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
                             </div>
                         </form>
                     </div>
