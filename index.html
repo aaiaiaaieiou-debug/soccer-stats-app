@@ -99,6 +99,7 @@
             const [editingMatch, setEditingMatch] = useState(null);
             const [isEditMode, setIsEditMode] = useState(false);
             const [showPasswordModal, setShowPasswordModal] = useState(false);
+            const [selectedPlayer, setSelectedPlayer] = useState(null);
 
             useEffect(() => {
                 if (!auth) return;
@@ -171,12 +172,12 @@
             const renderPage = () => {
                 switch (page) {
                     case 'dashboard': return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode} />;
-                    case 'rankings': return <RankingsPage playerStats={playerStats} matches={matches} players={players} />;
+                    case 'rankings': return <RankingsPage playerStats={playerStats} matches={matches} players={players} onPlayerSelect={setSelectedPlayer} />;
                     case 'match-list': return <MatchList navigate={navigate} matches={matches} players={players} isEditMode={isEditMode} />;
-                    case 'player-management': return <PlayerManagement players={players} />;
+                    case 'player-management': return <PlayerManagement players={players} storage={storage} />;
                     case 'add-match': return <MatchForm navigate={navigate} players={players} />;
                     case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
-                    case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} />;
+                    case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} onPlayerSelect={setSelectedPlayer} />;
                     default: return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode}/>;
                 }
             };
@@ -188,6 +189,7 @@
                     <Header navigate={navigate} isEditMode={isEditMode} onEditModeToggle={() => setShowPasswordModal(true)} onLogout={logout} />
                     <main className="p-4 sm:p-8">{renderPage()}</main>
                     {showPasswordModal && <PasswordModal onSubmit={handlePasswordSubmit} onClose={() => setShowPasswordModal(false)} />}
+                    {selectedPlayer && <PlayerDetailModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
                 </div>
             );
         }
