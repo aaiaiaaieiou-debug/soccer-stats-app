@@ -48,12 +48,11 @@
         };
         const appId = firebaseConfig.projectId;
 
-        let app, db, auth, storage;
+        let app, db, auth;
         try {
             app = firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
             auth = firebase.auth();
-            storage = firebase.storage();
         } catch (e) {
             console.error("Firebase initialization error:", e);
             document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。";
@@ -85,7 +84,14 @@
                     if (!currentUser) {
                         try {
                            await auth.signInAnonymously();
-                        } catch (error) { console.error("Authentication failed: ", error); }
+                        } catch (error) { 
+                            console.error("Authentication failed: ", error); 
+                            if (error.code === 'auth/configuration-not-found') {
+                                document.getElementById('root').innerText = "認証エラー: Firebaseコンソールで匿名認証が有効になっていません。Firebaseプロジェクトの設定を確認してください。";
+                            } else {
+                                document.getElementById('root').innerText = "認証エラーが発生しました。";
+                            }
+                        }
                     }
                     setIsAuthReady(true);
                 });
@@ -185,7 +191,7 @@
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between items-center h-20">
                             <div className="flex items-center cursor-pointer" onClick={() => handleNavigate('dashboard')}>
-                                {emblemUrl ? <img src={emblemUrl} alt="チームエンブレム" className="h-14 w-auto mr-2 md:mr-4"/> : <TeamEmblemPlaceholder />}
+                                {emblemUrl ? <img src={emblemUrl} alt="チームエンブレム" className="h-14 w-auto mr-2 md:mr-4"/> : <div className="h-14 w-14 mr-2 md:mr-4"></div>}
                                 <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-wider">FURUGEN MINAMI FC</h1>
                             </div>
                             {/* Desktop Menu */}
@@ -687,7 +693,8 @@
         function MatchForm({ navigate, players, existingMatch }) {
             const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'All', regulation: '前後半', regulationTime: 20 };
             const [match, setMatch] = useState(initialMatchState);
-            const categories = ['All', 'U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
+            const [selectedCategories, setSelectedCategories] = useState(['All']);
+            const categories = ['All', 'U12', 'U11', 'U10'];
             const positions = ['GK', 'DF', 'MF', 'FW', 'FP'];
 
             useEffect(() => {
@@ -708,20 +715,60 @@
             useEffect(() => {
                 if (existingMatch) {
                     setMatch(prev => ({ ...initialMatchState, ...existingMatch }));
+                    if(existingMatch.matchCategories) {
+                        setSelectedCategories(existingMatch.matchCategories);
+                    }
                 } else {
                     setMatch(initialMatchState);
+                    setSelectedCategories(['All']);
                 }
             }, [existingMatch]);
             
-            const filteredPlayers = useMemo(() => {
-                if (match.matchCategory === 'All') return players;
-                const filterAge = parseInt(match.matchCategory.replace('U', ''));
-                return players.filter(p => {
-                    if (!p.category) return false;
-                    const playerAge = parseInt(p.category.replace('U', ''));
-                    return playerAge <= filterAge;
+            const handleCategoryChange = (category) => {
+                setSelectedCategories(prev => {
+                    if (category === 'All') {
+                        return prev.includes('All') ? prev.filter(c => c !== 'All') : ['All'];
+                    }
+                    let newSelection = prev.filter(c => c !== 'All');
+                    if (newSelection.includes(category)) {
+                        newSelection = newSelection.filter(c => c !== category);
+                    } else {
+                        newSelection.push(category);
+                    }
+                    if (newSelection.length === 0) {
+                        return ['All'];
+                    }
+                    return newSelection;
                 });
-            }, [players, match.matchCategory]);
+            };
+
+            const filteredPlayers = useMemo(() => {
+                let playersToShow = [];
+                if (selectedCategories.includes('All')) {
+                    playersToShow = players;
+                } else {
+                    const playersSet = new Set();
+                    selectedCategories.forEach(cat => {
+                        if (cat === 'U10') {
+                            players.forEach(p => {
+                                if (!p.category) return;
+                                const playerAge = parseInt(p.category.replace('U', ''));
+                                if (playerAge <= 10) {
+                                    playersSet.add(p);
+                                }
+                            });
+                        } else {
+                            players.forEach(p => {
+                                if (p.category === cat) {
+                                    playersSet.add(p);
+                                }
+                            });
+                        }
+                    });
+                    playersToShow = Array.from(playersSet);
+                }
+                return playersToShow.sort((a, b) => a.number - b.number);
+            }, [players, selectedCategories]);
 
             const handleChange = (e) => { 
                 const { name, value, type, checked } = e.target;
@@ -768,7 +815,7 @@
                 }
 
                 const path = `artifacts/${appId}/public/data/matches`;
-                const data = { ...match, ownScore: parseInt(match.ownScore, 10) || 0, opponentScore: parseInt(match.opponentScore, 10) || 0, ownPkScore: parseInt(match.ownPkScore, 10) || 0, opponentPkScore: parseInt(match.opponentPkScore, 10) || 0 };
+                const data = { ...match, ownScore: parseInt(match.ownScore, 10) || 0, opponentScore: parseInt(match.opponentScore, 10) || 0, ownPkScore: parseInt(match.ownPkScore, 10) || 0, opponentPkScore: parseInt(match.opponentPkScore, 10) || 0, matchCategories: selectedCategories };
                 try {
                     if (existingMatch) await db.collection(path).doc(existingMatch.id).update(data);
                     else await db.collection(path).add(data);
@@ -818,10 +865,21 @@
                 )}
             </div></FormSection>
             <FormSection title="出場選手">
-                <div className="mb-4"><label htmlFor="matchCategory" className="block text-sm font-medium text-gray-400">試合のカテゴリー</label>
-                    <select id="matchCategory" name="matchCategory" value={match.matchCategory || 'All'} onChange={handleChange} className="mt-1 block w-full md:w-1/3 bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-400">試合のカテゴリー</label>
+                    <div className="flex flex-wrap gap-4 mt-2">
+                        {categories.map(cat => (
+                            <label key={cat} className="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedCategories.includes(cat)}
+                                    onChange={() => handleCategoryChange(cat)}
+                                    className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500"
+                                />
+                                <span>{cat}</span>
+                            </label>
+                        ))}
+                    </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-8">
                     <div>
@@ -857,7 +915,7 @@
         
         const FormSection = ({ title, children }) => (<div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700"><h3 className="text-xl font-semibold mb-6 border-b border-gray-700 pb-3 text-white">{title}</h3>{children}</div>);
         const InputField = ({ label, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><input {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" /></div>);
-        const SelectField = ({ label, name, value, onChange, options, defaultOption, ...props }) => (<div>{label && <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>}<select name={name} value={value} onChange={onChange} {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">{defaultOption && <option value="">{defaultOption}</option>}{options.map((opt, index) => (typeof opt === 'object' ? <option key={opt.value || index} value={opt.value}>{opt.label}</option> : <option key={opt} value={opt}>{opt}</option>))}</select></div>);
+        const SelectField = ({ label, name, value, onChange, options, defaultOption, ...props }) => (<div>{label && <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>}<select name={name} value={value} onChange={onChange} {...props} className="block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">{defaultOption && <option value="">{defaultOption}</option>}{options.map((opt, index) => (typeof opt === 'object' ? <option key={opt.value || index} value={opt.value}>{opt.label}</option> : <option key={opt} value={opt}>{opt}</option>))}</select></div>);
         
         function EditStatsModal({ player, onSave, onClose }) {
             const [stats, setStats] = useState(player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 });
