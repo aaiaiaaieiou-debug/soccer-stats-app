@@ -525,6 +525,15 @@
                 try { await db.collection(`artifacts/${appId}/public/data/matches`).doc(id).delete(); } 
                 catch (error) { console.error("Error deleting match: ", error); alert("試合記録の削除中にエラーが発生しました。"); }
             };
+
+            const getFormation = (starters) => {
+                if (!starters || starters.length === 0) return '';
+                const df = starters.filter(s => s.position === 'DF').length;
+                const mf = starters.filter(s => s.position === 'MF').length;
+                const fw = starters.filter(s => s.position === 'FW').length;
+                return `(${df}-${mf}-${fw})`;
+            };
+
             return (
                 <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
                     <div className="p-6">
@@ -577,7 +586,7 @@
                                     {match.pkExists && <div className="md:col-span-2"><p><strong>PK戦:</strong> {match.ownPkScore} - {match.opponentPkScore}</p></div>}
                                     <div className="md:col-span-2"><p><strong>得点者:</strong> {(match.goals || []).map(g => `${getPlayerName(g.scorerId)}${g.assistId ? ` (${getPlayerName(g.assistId)})` : ''}`).join(', ') || 'なし'}</p></div>
                                     <div className="md:col-span-2">
-                                        <h4 className="font-bold mt-2">スターティングメンバー</h4>
+                                        <h4 className="font-bold mt-2">スターティングメンバー <span className="text-gray-400 font-normal">(フォーメーション {getFormation(match.starters)})</span></h4>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1">
                                             {(match.starters || []).map(s => <p key={s.playerId}>{s.position}: {getPlayerName(s.playerId)}</p>)}
                                         </div>
