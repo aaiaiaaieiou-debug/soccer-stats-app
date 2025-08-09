@@ -146,8 +146,8 @@
                     const base = player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
                     const calc = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
                     matches.forEach(m => {
-                        const isStarter = (m.starters || []).includes(player.id);
-                        const isSub = (m.subs || []).includes(player.id);
+                        const isStarter = (m.starters || []).some(s => s.playerId === player.id);
+                        const isSub = (m.subs || []).some(s => s.playerIn === player.id);
                         if (isStarter || isSub) {
                             calc.matchesPlayed++;
                         }
