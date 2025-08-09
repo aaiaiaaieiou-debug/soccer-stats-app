@@ -685,7 +685,7 @@
         }
         
         function MatchForm({ navigate, players, existingMatch }) {
-            const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '8人制', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'All', regulation: '前後半', regulationTime: 20 };
+            const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'All', regulation: '前後半', regulationTime: 20 };
             const [match, setMatch] = useState(initialMatchState);
             const categories = ['All', 'U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
             const positions = ['GK', 'DF', 'MF', 'FW', 'FP'];
@@ -700,6 +700,8 @@
                         currentStarters[i] || { position: 'FP', playerId: '' }
                     );
                     setMatch(prev => ({...prev, starters: newStarters.slice(0, requiredStarters)}));
+                } else if (!requiredStarters) {
+                    setMatch(prev => ({...prev, starters: []}));
                 }
             }, [match.format]);
 
@@ -733,6 +735,7 @@
                     return { ...prev, starters: newStarters };
                 });
             };
+            const addStarter = () => setMatch(prev => ({ ...prev, starters: [...(prev.starters || []), { position: 'FP', playerId: '' }] }));
             const removeStarter = (index) => setMatch(prev => ({ ...prev, starters: prev.starters.filter((_, i) => i !== index) }));
 
             const handleSubChange = (index, field, value) => {
@@ -792,7 +795,7 @@
                 {(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}
                 <InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required />
                 <InputField label="会場" name="venue" value={match.venue} onChange={handleChange} placeholder="例：〇〇グラウンド" />
-                <SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['8人制', '11人制', 'フットサル', 'その他']} />
+                <SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['-', '8人制', '11人制', 'フットサル', 'その他']} />
                 <SelectField label="天気" name="weather" value={match.weather} onChange={handleChange} options={['晴れ', '曇り', '雨', '雪']} />
                 <SelectField label="結果" name="result" value={match.result} onChange={handleChange} options={['勝利', '敗戦', '引分']} />
                 <InputField label="自チーム得点" type="number" name="ownScore" value={match.ownScore} onChange={handleChange} />
