@@ -341,9 +341,6 @@
             const totalAssistRanking = [...playerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
 
             const CategoryRankings = ({ category }) => {
-                const categoryMatches = useMemo(() => sortedMatches.filter(m => m.matchCategory === category), [sortedMatches, category]);
-                const last10CategoryMatches = useMemo(() => categoryMatches.slice(0, 10), [categoryMatches]);
-                
                 const categoryPlayers = useMemo(() => {
                     const categoryAge = parseInt(category.replace('U', ''));
                     if (category === 'U10') {
@@ -369,14 +366,21 @@
                             totalAssists: totalPlayerStat ? totalPlayerStat.totalAssists : 0,
                         }; 
                     });
-                    last10CategoryMatches.forEach(m => {
+
+                    const last10OverallMatches = sortedMatches.slice(0, 10);
+
+                    last10OverallMatches.forEach(m => {
                         (m.goals || []).forEach(g => {
-                            if (stats[g.scorerId]) stats[g.scorerId].recentGoals++;
-                            if (stats[g.assistId]) stats[g.assistId].recentAssists++;
+                            if (stats[g.scorerId]) {
+                                stats[g.scorerId].recentGoals++;
+                            }
+                            if (stats[g.assistId]) {
+                                stats[g.assistId].recentAssists++;
+                            }
                         });
                     });
                     return Object.values(stats);
-                }, [categoryPlayers, last10CategoryMatches, playerStats]);
+                }, [categoryPlayers, sortedMatches, playerStats]);
 
                 const recentGoalRanking = [...categoryPlayerStats].filter(p => p.recentGoals > 0).sort((a, b) => b.recentGoals - a.recentGoals).slice(0, 5);
                 const recentAssistRanking = [...categoryPlayerStats].filter(p => p.recentAssists > 0).sort((a, b) => b.recentAssists - a.recentAssists).slice(0, 5);
