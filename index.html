@@ -904,7 +904,7 @@
                         <div className="space-y-2">
                             {(match.subs || []).map((sub, index) => (
                                 <div key={index} className="flex items-center gap-2">
-                                    <SelectField label="" name="playerOut" value={sub.playerOut} onChange={(e) => handleSubChange(index, 'playerOut', e.target.value)} options={(match.starters || []).map(s => ({value: s.playerId, label: players.find(p=>p.id === s.playerId)?.name || ''}))} defaultOption="OUT" />
+                                    <SelectField label="" name="playerOut" value={sub.playerOut} onChange={(e) => handleSubChange(index, 'playerOut', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="OUT" />
                                     <SelectField label="" name="playerIn" value={sub.playerIn} onChange={(e) => handleSubChange(index, 'playerIn', e.target.value)} options={filteredPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}`}))} defaultOption="IN" />
                                     <button type="button" onClick={() => removeSub(index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
                                 </div>
