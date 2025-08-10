@@ -16,7 +16,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
 
     <style>
         body {
@@ -691,7 +690,7 @@
         }
         
         function MatchForm({ navigate, players, existingMatch }) {
-            const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'All', regulation: '前後半', regulationTime: 20 };
+            const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'U12', regulation: '前後半', regulationTime: 20 };
             const [match, setMatch] = useState(initialMatchState);
             const [selectedCategories, setSelectedCategories] = useState(['All']);
             const categories = ['All', 'U12', 'U11', 'U10'];
@@ -727,7 +726,7 @@
             const handleCategoryChange = (category) => {
                 setSelectedCategories(prev => {
                     if (category === 'All') {
-                        return prev.includes('All') ? prev.filter(c => c !== 'All') : ['All'];
+                        return prev.includes('All') ? [] : ['All'];
                     }
                     let newSelection = prev.filter(c => c !== 'All');
                     if (newSelection.includes(category)) {
@@ -838,6 +837,7 @@
 
             return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6">
                 <InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required />
+                <SelectField label="試合のカテゴリー" name="matchCategory" value={match.matchCategory} onChange={handleChange} options={['U12', 'U11', 'U10', 'その他']} />
                 <SelectField label="試合形式" name="matchType" value={match.matchType} onChange={handleChange} options={['TRM', '公式戦', 'カップ戦', 'その他']} />
                 {(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}
                 <InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required />
@@ -866,7 +866,7 @@
             </div></FormSection>
             <FormSection title="出場選手">
                 <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-400">試合のカテゴリー</label>
+                    <label className="block text-sm font-medium text-gray-400">出場選手カテゴリーで絞り込み</label>
                     <div className="flex flex-wrap gap-4 mt-2">
                         {categories.map(cat => (
                             <label key={cat} className="flex items-center space-x-2">
@@ -915,7 +915,7 @@
         
         const FormSection = ({ title, children }) => (<div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700"><h3 className="text-xl font-semibold mb-6 border-b border-gray-700 pb-3 text-white">{title}</h3>{children}</div>);
         const InputField = ({ label, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><input {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" /></div>);
-        const SelectField = ({ label, name, value, onChange, options, defaultOption, ...props }) => (<div>{label && <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>}<select name={name} value={value} onChange={onChange} {...props} className="block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">{defaultOption && <option value="">{defaultOption}</option>}{options.map((opt, index) => (typeof opt === 'object' ? <option key={opt.value || index} value={opt.value}>{opt.label}</option> : <option key={opt} value={opt}>{opt}</option>))}</select></div>);
+        const SelectField = ({ label, name, value, onChange, options, defaultOption, ...props }) => (<div>{label && <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>}<select name={name} value={value} onChange={onChange} {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">{defaultOption && <option value="">{defaultOption}</option>}{options.map((opt, index) => (typeof opt === 'object' ? <option key={opt.value || index} value={opt.value}>{opt.label}</option> : <option key={opt} value={opt}>{opt}</option>))}</select></div>);
         
         function EditStatsModal({ player, onSave, onClose }) {
             const [stats, setStats] = useState(player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 });
