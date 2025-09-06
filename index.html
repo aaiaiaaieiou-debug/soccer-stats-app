@@ -77,25 +77,7 @@
             const [isEditMode, setIsEditMode] = useState(false);
             const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-            useEffect(() => {
-                if (!auth) return;
-                const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-                    if (!currentUser) {
-                        try {
-                           await auth.signInAnonymously();
-                        } catch (error) { 
-                            console.error("Authentication failed: ", error); 
-                            if (error.code === 'auth/configuration-not-found') {
-                                document.getElementById('root').innerText = "認証エラー: Firebaseコンソールで匿名認証が有効になっていません。Firebaseプロジェクトの設定を確認してください。";
-                            } else {
-                                document.getElementById('root').innerText = "認証エラーが発生しました。";
-                            }
-                        }
-                    }
-                    setIsAuthReady(true);
-                });
-                return () => unsubscribe();
-            }, []);
+            
 
             useEffect(() => {
                 if (!isAuthReady || !db) return;
@@ -952,5 +934,6 @@ function PasswordModal({ onSubmit, onClose }) {
     </script>
 </body>
 </html>
+
 
 
