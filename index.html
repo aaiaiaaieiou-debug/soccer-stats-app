@@ -77,25 +77,35 @@
             const [isEditMode, setIsEditMode] = useState(false);
             const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-            useEffect(() => {
-                if (!auth) return;
-                const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-                    if (!currentUser) {
-                        try {
-                           await auth.signInAnonymously();
-                        } catch (error) { 
-                            console.error("Authentication failed: ", error); 
-                            if (error.code === 'auth/configuration-not-found') {
-                                document.getElementById('root').innerText = "認証エラー: Firebaseコンソールで匿名認証が有効になっていません。Firebaseプロジェクトの設定を確認してください。";
-                            } else {
-                                document.getElementById('root').innerText = "認証エラーが発生しました。";
-                            }
+           useEffect(() => {
+            if (!auth) {
+                // authオブジェクトがない場合、何もしない
+                return;
+            }
+            
+            // ユーザーの認証状態を監視
+            const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+                if (!currentUser) {
+                    // もしログインしていない場合は、匿名でログインを試みる
+                    try {
+                        await auth.signInAnonymously();
+                        console.log("匿名ログインに成功しました。");
+                    } catch (error) { 
+                        console.error("匿名ログインに失敗しました: ", error); 
+                        if (error.code === 'auth/configuration-not-found') {
+                            document.getElementById('root').innerText = "認証エラー: Firebaseコンソールで匿名認証が有効になっていません。Firebaseプロジェクトの設定を確認してください。";
+                        } else {
+                            document.getElementById('root').innerText = "認証エラーが発生しました。";
                         }
                     }
-                    setIsAuthReady(true);
-                });
-                return () => unsubscribe();
-            }, []);
+                }
+                // 認証状態の準備ができたことを示す
+                setIsAuthReady(true);
+            });
+
+            // コンポーネントがアンマウントされるときに監視を停止する
+            return () => unsubscribe();
+        }, []);
 
             useEffect(() => {
                 if (!isAuthReady || !db) return;
@@ -952,4 +962,5 @@ function PasswordModal({ onSubmit, onClose }) {
     </script>
 </body>
 </html>
+
 
