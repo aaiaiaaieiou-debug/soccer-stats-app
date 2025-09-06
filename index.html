@@ -21,57 +21,33 @@
 <body class="bg-gray-900">
     <div id="root"></div>
 
-    <!-- Firebase Libraries (Modular Version - Recommended) -->
-    <script type="module">
+    <script type="text/babel">
+        // --- Firebase ライブラリを直接インポート ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        window.firebaseTools = {
-            initializeApp,
-            getAuth,
-            signInAnonymously,
-            signInWithCustomToken,
-            onAuthStateChanged,
-            getFirestore,
-            collection,
-            onSnapshot,
-            doc,
-            addDoc,
-            updateDoc,
-            deleteDoc,
-            setLogLevel
-        };
-    </script>
-
-    <script type="text/babel">
         window.onload = function() {
             const { useState, useEffect, useMemo } = React;
             
-            // --- Firebaseのグローバル変数が存在するかチェック ---
-            if (typeof __app_id === 'undefined' || typeof __firebase_config === 'undefined') {
-                console.error("Firebase config variables are not defined.");
-                document.getElementById('root').innerText = "エラー: アプリケーションの設定が読み込めませんでした。";
-                return;
-            }
-
-            if (!window.firebaseTools) {
-                console.error("Firebase library failed to load.");
-                document.getElementById('root').innerText = "エラー: データベースライブラリの読み込みに失敗しました。ページを再読み込みしてください。";
-                return;
-            }
-
-            // --- Firebaseの初期化 (新しい推奨方式) ---
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const firebaseConfig = JSON.parse(__firebase_config);
+            // --- Firebaseの初期化 (元の設定情報に戻します) ---
+            const firebaseConfig = {
+                apiKey: "AIzaSyCmU2dJyLFFpODmuD7mkQJwDszvIo7xU68",
+                authDomain: "soccer-stats-fmfc.firebaseapp.com",
+                projectId: "soccer-stats-fmfc",
+                storageBucket: "soccer-stats-fmfc.appspot.com",
+                messagingSenderId: "812354510220",
+                appId: "1:812354510220:web:966a4d86b2d49652facaa9"
+            };
+            const appId = firebaseConfig.projectId;
 
             let app, db, auth;
             try {
-                app = window.firebaseTools.initializeApp(firebaseConfig);
-                db = window.firebaseTools.getFirestore(app);
-                auth = window.firebaseTools.getAuth(app);
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
                 // デバッグ用のログを有効化
-                window.firebaseTools.setLogLevel('debug'); 
+                setLogLevel('debug'); 
             } catch (e) {
                 console.error("Firebase initialization error:", e);
                 document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。";
@@ -97,21 +73,15 @@
                 const [isEditMode, setIsEditMode] = useState(false);
                 const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-                // --- 認証状態の監視 (新しい方式) ---
+                // --- 認証状態の監視 ---
                 useEffect(() => {
                     if (!auth) return;
-                    const unsubscribe = window.firebaseTools.onAuthStateChanged(auth, async (currentUser) => {
+                    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
                         if (!currentUser) {
                             try {
-                                // プラットフォームから提供されるカスタムトークンでサインインを試みる
-                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                    await window.firebaseTools.signInWithCustomToken(auth, __initial_auth_token);
-                                } else {
-                                    // トークンがなければ匿名認証にフォールバック
-                                    await window.firebaseTools.signInAnonymously(auth);
-                                }
+                                await signInAnonymously(auth);
                             } catch (error) {
-                                console.error("Authentication failed: ", error);
+                                console.error("Anonymous authentication failed: ", error);
                                 document.getElementById('root').innerText = "認証エラーが発生しました。ページを再読み込みしてください。";
                             }
                         }
@@ -120,21 +90,21 @@
                     return () => unsubscribe();
                 }, []);
 
-                // --- データ取得 (新しい方式) ---
+                // --- データ取得 ---
                 useEffect(() => {
                     if (!isAuthReady || !db) return;
                     
                     const playersCollectionPath = `artifacts/${appId}/public/data/players`;
                     const matchesCollectionPath = `artifacts/${appId}/public/data/matches`;
 
-                    const playersQuery = window.firebaseTools.collection(db, playersCollectionPath);
-                    const matchesQuery = window.firebaseTools.collection(db, matchesCollectionPath);
+                    const playersQuery = collection(db, playersCollectionPath);
+                    const matchesQuery = collection(db, matchesCollectionPath);
 
-                    const unsubPlayers = window.firebaseTools.onSnapshot(playersQuery, 
+                    const unsubPlayers = onSnapshot(playersQuery, 
                         (snap) => setPlayers(snap.docs.map(d => ({id: d.id, ...d.data()}))), 
                         (e) => console.error("Player fetch error", e)
                     );
-                    const unsubMatches = window.firebaseTools.onSnapshot(matchesQuery, 
+                    const unsubMatches = onSnapshot(matchesQuery, 
                         (snap) => setMatches(snap.docs.map(d => ({id: d.id, ...d.data()}))), 
                         (e) => console.error("Match fetch error", e)
                     );
@@ -154,8 +124,6 @@
                 const handlePasswordSubmit = (password) => {
                     if (password === 'soccer') { setIsEditMode(true); setShowPasswordModal(false); } 
                     else { 
-                      // alert()は環境によっては表示されないため、モーダル内でエラー表示するのが望ましい
-                      // ここでは簡易的にconsole.errorを使用
                       console.error('合言葉が違います。');
                     }
                 };
@@ -214,7 +182,7 @@
                 );
             }
 
-            // --- PlayerManagement コンポーネント (DB操作を新しい方式に更新) ---
+            // --- PlayerManagement コンポーネント ---
             function PlayerManagement({ players }) {
                 const [name, setName] = useState('');
                 const [number, setNumber] = useState('');
@@ -222,7 +190,7 @@
                 const [editingPlayer, setEditingPlayer] = useState(null);
                 const categories = ['U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
                 
-                const playersCollectionRef = window.firebaseTools.collection(db, `artifacts/${appId}/public/data/players`);
+                const playersCollectionRef = collection(db, `artifacts/${appId}/public/data/players`);
 
                 const handleSubmit = async (e) => {
                     e.preventDefault();
@@ -234,12 +202,12 @@
                     
                     try {
                         if (editingPlayer) {
-                            const playerDocRef = window.firebaseTools.doc(playersCollectionRef, editingPlayer.id);
-                            await window.firebaseTools.updateDoc(playerDocRef, playerData);
+                            const playerDocRef = doc(playersCollectionRef, editingPlayer.id);
+                            await updateDoc(playerDocRef, playerData);
                             setEditingPlayer(null);
                         } else {
                             playerData.baseStats = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
-                            await window.firebaseTools.addDoc(playersCollectionRef, playerData);
+                            await addDoc(playersCollectionRef, playerData);
                         }
                         setName(''); setNumber(''); setCategory('U12');
                     } catch (error) {
@@ -256,8 +224,8 @@
 
                 const handleDelete = async (id) => {
                     try {
-                        const playerDocRef = window.firebaseTools.doc(playersCollectionRef, id);
-                        await window.firebaseTools.deleteDoc(playerDocRef);
+                        const playerDocRef = doc(playersCollectionRef, id);
+                        await deleteDoc(playerDocRef);
                     } catch (error) { 
                         console.error("Error deleting player: ", error);
                     }
@@ -301,11 +269,11 @@
                 );
             }
 
-            // --- MatchList コンポーネント (DB操作を新しい方式に更新) ---
+            // --- MatchList コンポーネント ---
             function MatchList({ navigate, matches, players, isEditMode }) {
                 const [categoryFilter, setCategoryFilter] = useState('All');
                 const categories = ['All', 'U12', 'U11', 'U10'];
-                const matchesCollectionRef = window.firebaseTools.collection(db, `artifacts/${appId}/public/data/matches`);
+                const matchesCollectionRef = collection(db, `artifacts/${appId}/public/data/matches`);
 
                 const getPlayerName = (id) => players.find(p => p.id === id)?.name || '不明';
                 
@@ -318,8 +286,8 @@
 
                 const handleDelete = async (id) => {
                     try {
-                        const matchDocRef = window.firebaseTools.doc(matchesCollectionRef, id);
-                        await window.firebaseTools.deleteDoc(matchDocRef);
+                        const matchDocRef = doc(matchesCollectionRef, id);
+                        await deleteDoc(matchDocRef);
                     } catch (error) { 
                         console.error("Error deleting match: ", error);
                     }
@@ -332,8 +300,7 @@
                     const fw = starters.filter(s => s.position === 'FW').length;
                     return `(${df}-${mf}-${fw})`;
                 };
-
-                // (MatchListのJSXは変更がないため省略、元のコードをそのまま使用)
+                
                 return (
                     <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
                         <div className="p-6">
@@ -405,7 +372,7 @@
                 );
             }
 
-            // --- PlayerStatsList コンポーネント (DB操作を新しい方式に更新) ---
+            // --- PlayerStatsList コンポーネント ---
             function PlayerStatsList({ playerStats, isEditMode }) {
                 const [sortConfig, setSortConfig] = useState({ key: 'category', direction: 'descending' });
                 const [editingPlayer, setEditingPlayer] = useState(null);
@@ -442,8 +409,8 @@
 
                 const handleUpdateStats = async (playerId, newBaseStats) => {
                     try {
-                        const playerDocRef = window.firebaseTools.doc(db, `artifacts/${appId}/public/data/players`, playerId);
-                        await window.firebaseTools.updateDoc(playerDocRef, { baseStats: newBaseStats });
+                        const playerDocRef = doc(db, `artifacts/${appId}/public/data/players`, playerId);
+                        await updateDoc(playerDocRef, { baseStats: newBaseStats });
                         setEditingPlayer(null);
                     } catch (error) { 
                         console.error("Error updating stats: ", error);
@@ -457,7 +424,6 @@
                 ];
                 if (isEditMode) columns.push({ label: '操作', key: 'actions' });
                 
-                // (PlayerStatsListのJSXは変更がないため省略、元のコードをそのまま使用)
                 return (
                     <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
                         <h2 className="text-2xl font-semibold p-6">選手成績一覧</h2>
@@ -487,9 +453,8 @@
                 );
             }
 
-            // --- MatchForm コンポーネント (DB操作を新しい方式に更新) ---
+            // --- MatchForm コンポーネント ---
             function MatchForm({ navigate, players, existingMatch }) {
-                // ... (MatchFormの内部ロジックは長いため、変更点のみコメント)
                 const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'U12', regulation: '前後半', regulationTime: 20 };
                 const [match, setMatch] = useState(initialMatchState);
                 const [selectedCategories, setSelectedCategories] = useState(['All']);
@@ -614,15 +579,15 @@
                     }
 
                     const path = `artifacts/${appId}/public/data/matches`;
-                    const matchesCollectionRef = window.firebaseTools.collection(db, path);
+                    const matchesCollectionRef = collection(db, path);
                     const data = { ...match, ownScore: parseInt(match.ownScore, 10) || 0, opponentScore: parseInt(match.opponentScore, 10) || 0, ownPkScore: parseInt(match.ownPkScore, 10) || 0, opponentPkScore: parseInt(match.opponentPkScore, 10) || 0, matchCategories: selectedCategories };
 
                     try {
                         if (existingMatch) {
-                            const matchDocRef = window.firebaseTools.doc(matchesCollectionRef, existingMatch.id);
-                            await window.firebaseTools.updateDoc(matchDocRef, data);
+                            const matchDocRef = doc(matchesCollectionRef, existingMatch.id);
+                            await updateDoc(matchDocRef, data);
                         } else {
-                            await window.firebaseTools.addDoc(matchesCollectionRef, data);
+                            await addDoc(matchesCollectionRef, data);
                         }
                         navigate('match-list');
                     } catch (error) { 
@@ -642,7 +607,6 @@
                     return filteredPlayers.filter(p => !selectedIds.includes(p.id));
                 };
 
-                // (MatchFormのJSXは変更がないため省略、元のコードをそのまま使用)
                 return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6">
                     <InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required />
                     <SelectField label="試合のカテゴリー" name="matchCategory" value={match.matchCategory} onChange={handleChange} options={['U12', 'U11', 'U10', 'その他']} />
@@ -721,7 +685,7 @@
                 <FormSection title="得点記録">{(match.goals || []).map((goal, index) => (<div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4 p-4 bg-gray-900 rounded-lg"><SelectField label={`得点者 ${index + 1}`} name="scorerId" value={goal.scorerId} onChange={(e) => handleGoalChange(index, 'scorerId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="得点者を選択" /><SelectField label={`アシスト ${index + 1}`} name="assistId" value={goal.assistId} onChange={(e) => handleGoalChange(index, 'assistId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="アシスト者を選択" /><button type="button" onClick={() => removeGoal(index)} className="mt-6 bg-red-800 text-white px-3 py-2 rounded-md hover:bg-red-700">削除</button></div>))}<button type="button" onClick={addGoal} className="bg-sky-800 text-sky-200 font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition duration-300">得点を追加</button></FormSection><FormSection title="警告・退場"><div className="grid md:grid-cols-2 gap-8"><div><h4 className="font-semibold text-gray-300 mb-2">警告</h4>{(match.cautions || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('cautions', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('cautions', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('cautions')} className="text-sm text-sky-400 hover:underline">警告を追加</button></div><div><h4 className="font-semibold text-gray-300 mb-2">退場</h4>{(match.ejections || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('ejections', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('ejections', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('ejections')} className="text-sm text-sky-400 hover:underline">退場を追加</button></div></div></FormSection><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={() => navigate('match-list')} className="bg-gray-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-500">保存</button></div></form>);
             }
             
-            // --- 変更のないコンポーネントやヘルパー関数 (変更がないため、元のコードをそのまま使用) ---
+            // --- 変更のないコンポーネントやヘルパー関数 ---
             function Header({ navigate, isEditMode, onEditModeToggle, onLogout }) {
                 const emblemUrl = "https://i.imgur.com/h4W4M2S.jpeg";
                 const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1000,3 +964,4 @@
     </script>
 </body>
 </html>
+
