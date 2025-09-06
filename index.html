@@ -117,10 +117,28 @@
                 setPage(pageName);
             };
             
-            const handlePasswordSubmit = (password) => {
-                if (password === 'soccer') { setIsEditMode(true); setShowPasswordModal(false); } 
-                else { alert('合言葉が違います。'); }
-            };
+           // 修正後
+function PasswordModal({ onSubmit, onClose }) {
+    const [password, setPassword] = useState('');
+    const handleSubmit = async (e) => { // ★ asyncキーワードを追加
+        e.preventDefault();
+        const correctPassword = "your_secret_password"; // ★ここをあなたが決めたパスワードに変更
+
+        if (password === correctPassword) {
+            try {
+                // ★ 匿名認証を実行
+                await auth.signInAnonymously();
+                onSubmit(); // 認証成功後、親コンポーネントに伝える
+            } catch (error) {
+                console.error("匿名認証エラー:", error);
+                alert('認証中にエラーが発生しました。');
+            }
+        } else {
+            alert('合言葉が違います。');
+        }
+    };
+    // ...以降のコードは変更なし
+}
 
             const logout = () => { setIsEditMode(false); setPage('dashboard'); };
 
@@ -934,3 +952,4 @@
     </script>
 </body>
 </html>
+
