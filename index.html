@@ -122,7 +122,7 @@ function PasswordModal({ onSubmit, onClose }) {
     const [password, setPassword] = useState('');
     const handleSubmit = async (e) => { // ★ asyncキーワードを追加
         e.preventDefault();
-        const correctPassword = "your_secret_password"; // ★ここをあなたが決めたパスワードに変更
+        const correctPassword = "soccer"; // ★ここをあなたが決めたパスワードに変更
 
         if (password === correctPassword) {
             try {
@@ -952,4 +952,5 @@ function PasswordModal({ onSubmit, onClose }) {
     </script>
 </body>
 </html>
+
 
