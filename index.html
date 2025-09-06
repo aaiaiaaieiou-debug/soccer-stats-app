@@ -11,11 +11,6 @@
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
     <!-- Babel for JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Firebase Libraries (Compatibility Version) -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 
     <style>
         body {
@@ -26,941 +21,982 @@
 <body class="bg-gray-900">
     <div id="root"></div>
 
-    <script type="text/babel">
-      window.onload = function() {
-        const { useState, useEffect, useMemo } = React;
-        
-        if (!window.firebase) {
-            console.error("Firebase library failed to load.");
-            document.getElementById('root').innerText = "エラー: データベースライブラリの読み込みに失敗しました。ページを再読み込みしてください。";
-            return;
-        }
+    <!-- Firebase Libraries (Modular Version - Recommended) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebaseの初期化 ---
-        const firebaseConfig = {
-          apiKey: "AIzaSyCmU2dJyLFFpODmuD7mkQJwDszvIo7xU68",
-          authDomain: "soccer-stats-fmfc.firebaseapp.com",
-          projectId: "soccer-stats-fmfc",
-          storageBucket: "soccer-stats-fmfc.appspot.com",
-          messagingSenderId: "812354510220",
-          appId: "1:812354510220:web:966a4d86b2d49652facaa9"
+        window.firebaseTools = {
+            initializeApp,
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            getFirestore,
+            collection,
+            onSnapshot,
+            doc,
+            addDoc,
+            updateDoc,
+            deleteDoc,
+            setLogLevel
         };
-        const appId = firebaseConfig.projectId;
+    </script>
 
-        let app, db, auth;
-        try {
-            app = firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            auth = firebase.auth();
-        } catch (e) {
-            console.error("Firebase initialization error:", e);
-            document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。";
-            return;
-        }
-
-        // --- アイコンコンポーネント ---
-        const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
-        const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
-        const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>;
-        const IconChevronDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>;
-        const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
-        const IconLock = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
-        const IconUnlock = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>;
-
-        // --- メインアプリケーションコンポーネント ---
-        function App() {
-            const [page, setPage] = useState('dashboard');
-            const [players, setPlayers] = useState([]);
-            const [matches, setMatches] = useState([]);
-            const [isAuthReady, setIsAuthReady] = useState(false);
-            const [editingMatch, setEditingMatch] = useState(null);
-            const [isEditMode, setIsEditMode] = useState(false);
-            const [showPasswordModal, setShowPasswordModal] = useState(false);
-
-           useEffect(() => {
-            if (!auth) {
-                // authオブジェクトがない場合、何もしない
+    <script type="text/babel">
+        window.onload = function() {
+            const { useState, useEffect, useMemo } = React;
+            
+            // --- Firebaseのグローバル変数が存在するかチェック ---
+            if (typeof __app_id === 'undefined' || typeof __firebase_config === 'undefined') {
+                console.error("Firebase config variables are not defined.");
+                document.getElementById('root').innerText = "エラー: アプリケーションの設定が読み込めませんでした。";
                 return;
             }
-            
-            // ユーザーの認証状態を監視
-            const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-                if (!currentUser) {
-                    // もしログインしていない場合は、匿名でログインを試みる
-                    try {
-                        await auth.signInAnonymously();
-                        console.log("匿名ログインに成功しました。");
-                    } catch (error) { 
-                        console.error("匿名ログインに失敗しました: ", error); 
-                        if (error.code === 'auth/configuration-not-found') {
-                            document.getElementById('root').innerText = "認証エラー: Firebaseコンソールで匿名認証が有効になっていません。Firebaseプロジェクトの設定を確認してください。";
-                        } else {
-                            document.getElementById('root').innerText = "認証エラーが発生しました。";
-                        }
-                    }
-                }
-                // 認証状態の準備ができたことを示す
-                setIsAuthReady(true);
-            });
 
-            // コンポーネントがアンマウントされるときに監視を停止する
-            return () => unsubscribe();
-        }, []);
-
-            useEffect(() => {
-                if (!isAuthReady || !db) return;
-                const playersCollectionPath = `artifacts/${appId}/public/data/players`;
-                const matchesCollectionPath = `artifacts/${appId}/public/data/matches`;
-
-                const unsubPlayers = db.collection(playersCollectionPath).onSnapshot((snap) => setPlayers(snap.docs.map(d => ({id: d.id, ...d.data()}))), (e) => console.error("Player fetch error", e));
-                const unsubMatches = db.collection(matchesCollectionPath).onSnapshot((snap) => setMatches(snap.docs.map(d => ({id: d.id, ...d.data()}))), (e) => console.error("Match fetch error", e));
-
-                return () => { unsubPlayers(); unsubMatches(); };
-            }, [isAuthReady]);
-
-            const navigate = (pageName, data = null) => {
-                if (pageName.includes('add') || pageName.includes('edit') || pageName.includes('management')) {
-                    if (!isEditMode) { setShowPasswordModal(true); return; }
-                }
-                if (pageName === 'edit-match') setEditingMatch(data);
-                else setEditingMatch(null);
-                setPage(pageName);
-            };
-            
-           // 修正後
-function PasswordModal({ onSubmit, onClose }) {
-    const [password, setPassword] = useState('');
-    const handleSubmit = async (e) => { // ★ asyncキーワードを追加
-        e.preventDefault();
-        const correctPassword = "soccer"; // ★ここをあなたが決めたパスワードに変更
-
-        if (password === correctPassword) {
-            try {
-                // ★ 匿名認証を実行
-                await auth.signInAnonymously();
-                onSubmit(); // 認証成功後、親コンポーネントに伝える
-            } catch (error) {
-                console.error("匿名認証エラー:", error);
-                alert('認証中にエラーが発生しました。');
+            if (!window.firebaseTools) {
+                console.error("Firebase library failed to load.");
+                document.getElementById('root').innerText = "エラー: データベースライブラリの読み込みに失敗しました。ページを再読み込みしてください。";
+                return;
             }
-        } else {
-            alert('合言葉が違います。');
-        }
-    };
-    // ...以降のコードは変更なし
-}
 
-            const logout = () => { setIsEditMode(false); setPage('dashboard'); };
+            // --- Firebaseの初期化 (新しい推奨方式) ---
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const firebaseConfig = JSON.parse(__firebase_config);
 
-            const playerStats = useMemo(() => {
-                return players.map(player => {
-                    const base = player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
-                    const calc = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
-                    matches.forEach(m => {
-                        const isStarter = (m.starters || []).some(s => s.playerId === player.id);
-                        const isSub = (m.subs || []).some(s => s.playerIn === player.id);
-                        if (isStarter || isSub) {
-                            calc.matchesPlayed++;
-                        }
-                        (m.goals || []).forEach(g => {
-                            if (g.scorerId === player.id) calc.goals++;
-                            if (g.assistId === player.id) calc.assists++;
-                        });
-                        (m.cautions || []).forEach(c => { if (c.playerId === player.id) calc.cautions++; });
-                        (m.ejections || []).forEach(e => { if (e.playerId === player.id) calc.ejections++; });
-                    });
-                    return {
-                        ...player,
-                        totalMatchesPlayed: (base.matchesPlayed || 0) + calc.matchesPlayed,
-                        totalGoals: (base.goals || 0) + calc.goals,
-                        totalAssists: (base.assists || 0) + calc.assists,
-                        totalCautions: (base.cautions || 0) + calc.cautions,
-                        totalEjections: (base.ejections || 0) + calc.ejections,
-                    };
-                });
-            }, [players, matches]);
-            
-            const renderPage = () => {
-                switch (page) {
-                    case 'dashboard': return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode} />;
-                    case 'rankings': return <RankingsPage playerStats={playerStats} matches={matches} players={players} />;
-                    case 'match-list': return <MatchList navigate={navigate} matches={matches} players={players} isEditMode={isEditMode} />;
-                    case 'player-management': return <PlayerManagement players={players} />;
-                    case 'add-match': return <MatchForm navigate={navigate} players={players} />;
-                    case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
-                    case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} />;
-                    default: return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode}/>;
-                }
-            };
+            let app, db, auth;
+            try {
+                app = window.firebaseTools.initializeApp(firebaseConfig);
+                db = window.firebaseTools.getFirestore(app);
+                auth = window.firebaseTools.getAuth(app);
+                // デバッグ用のログを有効化
+                window.firebaseTools.setLogLevel('debug'); 
+            } catch (e) {
+                console.error("Firebase initialization error:", e);
+                document.getElementById('root').innerText = "エラー: データベースの初期化に失敗しました。";
+                return;
+            }
 
-            if (!isAuthReady) return <div className="flex justify-center items-center h-screen bg-gray-800"><div className="text-xl font-semibold text-white">読み込み中...</div></div>;
+            // --- アイコンコンポーネント (変更なし) ---
+            const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
+            const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
+            const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>;
+            const IconChevronDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>;
+            const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+            const IconLock = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
+            const IconUnlock = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>;
 
-            return (
-                <div className="bg-gray-900 min-h-screen font-sans text-white">
-                    <Header navigate={navigate} isEditMode={isEditMode} onEditModeToggle={() => setShowPasswordModal(true)} onLogout={logout} />
-                    <main className="p-4 sm:p-8">{renderPage()}</main>
-                    {showPasswordModal && <PasswordModal onSubmit={handlePasswordSubmit} onClose={() => setShowPasswordModal(false)} />}
-                </div>
-            );
-        }
+            // --- メインアプリケーションコンポーネント ---
+            function App() {
+                const [page, setPage] = useState('dashboard');
+                const [players, setPlayers] = useState([]);
+                const [matches, setMatches] = useState([]);
+                const [isAuthReady, setIsAuthReady] = useState(false);
+                const [editingMatch, setEditingMatch] = useState(null);
+                const [isEditMode, setIsEditMode] = useState(false);
+                const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-        function Header({ navigate, isEditMode, onEditModeToggle, onLogout }) {
-            const emblemUrl = "https://i.imgur.com/h4W4M2S.jpeg";
-            const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-            const handleNavigate = (page) => {
-                navigate(page);
-                setIsMenuOpen(false);
-            };
-            
-            return (
-                <header className="bg-gray-800 shadow-lg sticky top-0 z-40">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="flex justify-between items-center h-20">
-                            <div className="flex items-center cursor-pointer" onClick={() => handleNavigate('dashboard')}>
-                                {emblemUrl ? <img src={emblemUrl} alt="チームエンブレム" className="h-14 w-auto mr-2 md:mr-4"/> : <div className="h-14 w-14 mr-2 md:mr-4"></div>}
-                                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-wider">FURUGEN MINAMI FC</h1>
-                            </div>
-                            {/* Desktop Menu */}
-                            <nav className="hidden sm:flex items-center space-x-2">
-                                <button onClick={() => handleNavigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
-                                <button onClick={() => handleNavigate('rankings')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ランキング</button>
-                                <button onClick={() => handleNavigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
-                                {isEditMode && <button onClick={() => handleNavigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
-                                {isEditMode ? (
-                                    <button onClick={onLogout} className="flex items-center bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition-colors shadow-md"><IconUnlock className="mr-2"/>閲覧モード</button>
-                                ) : (
-                                    <button onClick={onEditModeToggle} className="flex items-center bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors shadow-md"><IconLock className="mr-2"/>編集モード</button>
-                                )}
-                            </nav>
-                             {/* Mobile Menu Button */}
-                            <div className="sm:hidden">
-                                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-300 hover:text-white focus:outline-none p-2">
-                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                     {/* Mobile Menu */}
-                    {isMenuOpen && (
-                        <div className="sm:hidden">
-                            <nav className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                                <button onClick={() => handleNavigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
-                                <button onClick={() => handleNavigate('rankings')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">ランキング</button>
-                                <button onClick={() => handleNavigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
-                                {isEditMode && <button onClick={() => handleNavigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
-                                <div className="pt-2">
-                                  {isEditMode ? (
-                                      <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="flex items-center w-full text-left bg-red-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-red-600 transition-colors shadow-md"><IconUnlock className="mr-2"/>閲覧モード</button>
-                                  ) : (
-                                      <button onClick={() => { onEditModeToggle(); setIsMenuOpen(false); }} className="flex items-center w-full text-left bg-sky-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-sky-600 transition-colors shadow-md"><IconLock className="mr-2"/>編集モード</button>
-                                  )}
-                                </div>
-                            </nav>
-                        </div>
-                    )}
-                </header>
-            );
-        }
-
-        function PasswordModal({ onSubmit, onClose }) {
-            const [password, setPassword] = useState('');
-            const handleSubmit = (e) => { e.preventDefault(); onSubmit(password); };
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-                    <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-sm m-4">
-                        <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-white">編集モード</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div>
-                        <p className="text-gray-400 mb-4">編集するには合言葉を入力してください。</p>
-                        <form onSubmit={handleSubmit}>
-                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white rounded-md shadow-sm py-2 px-3 mb-4 focus:ring-sky-500 focus:border-sky-500" placeholder="合言葉" autoFocus />
-                            <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">決定</button>
-                        </form>
-                    </div>
-                </div>
-            );
-        }
-
-        function Dashboard({ navigate, matches, isEditMode }) {
-            const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
-            
-            const CategoryDashboard = ({ category }) => {
-                const categoryMatches = useMemo(() => sortedMatches.filter(m => m.matchCategory === category), [sortedMatches, category]);
-                const last10CategoryMatches = useMemo(() => categoryMatches.slice(0, 10), [categoryMatches]);
-                
-                const teamStats = useMemo(() => {
-                    let wins = 0, losses = 0, draws = 0, goalsFor = 0, goalsAgainst = 0;
-                    last10CategoryMatches.forEach(match => {
-                        if (match.result === '勝利') wins++;
-                        else if (match.result === '敗戦') losses++;
-                        else if (match.result === '引分') draws++;
-                        goalsFor += match.ownScore || 0;
-                        goalsAgainst += match.opponentScore || 0;
-                    });
-                    return { wins, losses, draws, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, last5Matches: last10CategoryMatches.slice(0, 5) };
-                }, [last10CategoryMatches]);
-                
-                return (
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6 flex flex-col">
-                        <h3 className="text-3xl font-bold text-white text-center">{category}</h3>
-                        <div className="bg-gray-900 p-4 rounded-lg min-h-[160px]">
-                            <h4 className="text-lg font-semibold text-white mb-2 text-center">戦績 (直近10試合)</h4>
-                            {last10CategoryMatches.length > 0 ? (
-                                <>
-                                    <div className="flex justify-around text-center">
-                                        <div><p className="text-2xl font-bold text-green-400">{teamStats.wins}</p><p className="text-xs text-gray-400">勝利</p></div>
-                                        <div><p className="text-2xl font-bold text-red-400">{teamStats.losses}</p><p className="text-xs text-gray-400">敗戦</p></div>
-                                        <div><p className="text-2xl font-bold text-yellow-400">{teamStats.draws}</p><p className="text-xs text-gray-400">引分</p></div>
-                                    </div>
-                                    <div className="flex justify-around text-center pt-3 mt-3 border-t border-gray-700">
-                                        <div><p className="text-2xl font-bold text-sky-400">{teamStats.goalsFor}</p><p className="text-xs text-gray-400">得点</p></div>
-                                        <div><p className="text-2xl font-bold text-orange-400">{teamStats.goalsAgainst}</p><p className="text-xs text-gray-400">失点</p></div>
-                                        <div><p className={`text-2xl font-bold ${teamStats.goalDifference >= 0 ? 'text-green-400' : 'text-red-400'}`}>{teamStats.goalDifference > 0 ? '+' : ''}{teamStats.goalDifference}</p><p className="text-xs text-gray-400">得失点差</p></div>
-                                    </div>
-                                </>
-                            ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
-                        </div>
-                        <div className="bg-gray-900 p-4 rounded-lg min-h-[190px]">
-                            <h4 className="text-lg font-semibold mb-2 text-white text-center">最近の試合結果</h4>
-                            {teamStats.last5Matches.length > 0 ? (
-                                <ul className="space-y-2">
-                                    {teamStats.last5Matches.map(match => (
-                                        <li key={match.id} className="flex justify-between items-center text-sm">
-                                            <span>vs {match.opponent}</span>
-                                            <span className="font-bold">{match.ownScore} - {match.opponentScore}
-                                                <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${match.result === '勝利' ? 'bg-green-500 text-white' : match.result === '敗戦' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>
-                                                    {match.result}
-                                                </span>
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
-                        </div>
-                    </div>
-                );
-            };
-
-            return (
-                <div className="space-y-8">
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg text-center border border-gray-700">
-                        <h2 className="text-3xl font-bold text-white mb-4">TEAM DASHBOARD</h2>
-                        <p className="text-gray-400 mb-6">試合結果や選手の成績を記録・管理しましょう。</p>
-                        <div className="flex flex-col sm:flex-row justify-center gap-4">
-                            {isEditMode && <button onClick={() => navigate('add-match')} className="bg-red-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-600 transition-colors shadow-md flex items-center justify-center"><IconPlus /> <span className="ml-2">新しい試合を記録</span></button>}
-                            <button onClick={() => navigate('player-stats')} className="bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-colors shadow-md">選手成績一覧を見る</button>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <CategoryDashboard category="U12" />
-                        <CategoryDashboard category="U11" />
-                        <CategoryDashboard category="U10" />
-                    </div>
-                </div>
-            );
-        }
-
-        function RankingsPage({ playerStats, matches, players }) {
-            const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
-            
-            const totalGoalRanking = [...playerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
-            const totalAssistRanking = [...playerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
-
-            const CategoryRankings = ({ category }) => {
-                const categoryPlayers = useMemo(() => {
-                    const categoryAge = parseInt(category.replace('U', ''));
-                    if (category === 'U10') {
-                        return players.filter(p => {
-                            if (!p.category) return false;
-                            const playerAge = parseInt(p.category.replace('U', ''));
-                            return playerAge <= categoryAge;
-                        });
-                    } else {
-                        return players.filter(p => p.category === category);
-                    }
-                }, [players, category]);
-                
-                const categoryPlayerStats = useMemo(() => {
-                    const stats = {};
-                    categoryPlayers.forEach(p => { 
-                        const totalPlayerStat = playerStats.find(ps => ps.id === p.id);
-                        stats[p.id] = { 
-                            ...p,
-                            recentGoals: 0, 
-                            recentAssists: 0,
-                            totalGoals: totalPlayerStat ? totalPlayerStat.totalGoals : 0,
-                            totalAssists: totalPlayerStat ? totalPlayerStat.totalAssists : 0,
-                        }; 
-                    });
-
-                    const last10OverallMatches = sortedMatches.slice(0, 10);
-
-                    last10OverallMatches.forEach(m => {
-                        (m.goals || []).forEach(g => {
-                            if (stats[g.scorerId]) {
-                                stats[g.scorerId].recentGoals++;
-                            }
-                            if (stats[g.assistId]) {
-                                stats[g.assistId].recentAssists++;
-                            }
-                        });
-                    });
-                    return Object.values(stats);
-                }, [categoryPlayers, sortedMatches, playerStats]);
-
-                const recentGoalRanking = [...categoryPlayerStats].filter(p => p.recentGoals > 0).sort((a, b) => b.recentGoals - a.recentGoals).slice(0, 5);
-                const recentAssistRanking = [...categoryPlayerStats].filter(p => p.recentAssists > 0).sort((a, b) => b.recentAssists - a.recentAssists).slice(0, 5);
-                const categoryTotalGoalRanking = [...categoryPlayerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
-                const categoryTotalAssistRanking = [...categoryPlayerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
-
-                return (
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6 flex flex-col">
-                        <h3 className="text-3xl font-bold text-white text-center">{category}</h3>
-                        <RankingCard title="得点 (直近10試合)" ranking={recentGoalRanking} dataKey="recentGoals" unit="点" color="text-red-400" />
-                        <RankingCard title="アシスト (直近10試合)" ranking={recentAssistRanking} dataKey="recentAssists" unit="回" color="text-sky-400" />
-                        <RankingCard title="通算 得点" ranking={categoryTotalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
-                        <RankingCard title="通算 アシスト" ranking={categoryTotalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
-                    </div>
-                );
-            };
-
-            return (
-                 <div className="space-y-8">
-                    <h2 className="text-3xl font-bold text-white mb-4 text-center">ランキング</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <CategoryRankings category="U12" />
-                        <CategoryRankings category="U11" />
-                        <CategoryRankings category="U10" />
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-8 pt-8 border-t-2 border-gray-700">
-                        <RankingCard title="全体の通算 得点ランキング" ranking={totalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
-                        <RankingCard title="全体の通算 アシストランキング" ranking={totalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
-                    </div>
-                </div>
-            )
-        }
-
-        function RankingCard({ title, ranking, dataKey, unit, color }) {
-            const rankColors = ['text-yellow-400', 'text-gray-300', 'text-yellow-600'];
-            let lastScore = -1;
-            let currentRank = 0;
-            return (
-                <div className="bg-gray-900 p-4 rounded-lg min-h-[250px]">
-                    <h3 className="text-lg font-semibold mb-3 text-white text-center">{title}</h3>
-                    {ranking.length > 0 ? (
-                        <ol className="space-y-2">
-                            {ranking.map((player, index) => {
-                                if (player[dataKey] !== lastScore) {
-                                    currentRank = index + 1;
-                                    lastScore = player[dataKey];
+                // --- 認証状態の監視 (新しい方式) ---
+                useEffect(() => {
+                    if (!auth) return;
+                    const unsubscribe = window.firebaseTools.onAuthStateChanged(auth, async (currentUser) => {
+                        if (!currentUser) {
+                            try {
+                                // プラットフォームから提供されるカスタムトークンでサインインを試みる
+                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                    await window.firebaseTools.signInWithCustomToken(auth, __initial_auth_token);
+                                } else {
+                                    // トークンがなければ匿名認証にフォールバック
+                                    await window.firebaseTools.signInAnonymously(auth);
                                 }
-                                return (
-                                    <li key={player.id || player.name} className="flex items-center justify-between p-2 bg-gray-800 rounded-md text-sm">
-                                        <div className="flex items-center">
-                                            <span className={`font-bold w-7 ${rankColors[currentRank - 1] || 'text-gray-500'}`}>
-                                                {currentRank}.
-                                            </span>
-                                            <span className="font-medium">{player.name}</span>
-                                        </div>
-                                        <span className={`font-bold ${color}`}>{player[dataKey]} {unit}</span>
-                                    </li>
-                                );
-                            })}
-                        </ol>
-                    ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
-                </div>
-            );
-        }
-
-        function PlayerManagement({ players }) {
-            const [name, setName] = useState('');
-            const [number, setNumber] = useState('');
-            const [category, setCategory] = useState('U12');
-            const [editingPlayer, setEditingPlayer] = useState(null);
-            const categories = ['U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (!name || !number || !category) { alert("カテゴリー、選手名、背番号を入力してください。"); return; }
-                const playersCollectionPath = `artifacts/${appId}/public/data/players`;
-                const playerData = { name, number: parseInt(number, 10), category };
-                if (editingPlayer) {
-                    await db.collection(playersCollectionPath).doc(editingPlayer.id).update(playerData);
-                    setEditingPlayer(null);
-                } else {
-                    playerData.baseStats = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
-                    await db.collection(playersCollectionPath).add(playerData);
-                }
-                setName(''); setNumber(''); setCategory('U12');
-            };
-
-            const handleEdit = (player) => { 
-                setEditingPlayer(player); 
-                setName(player.name); 
-                setNumber(player.number); 
-                setCategory(player.category || 'U12');
-            };
-            const handleDelete = async (id) => {
-                try { await db.collection(`artifacts/${appId}/public/data/players`).doc(id).delete(); } 
-                catch (error) { console.error("Error deleting player: ", error); alert("選手の削除中にエラーが発生しました。"); }
-            };
-            
-            const sortedPlayers = [...players].sort((a,b) => a.number - b.number);
-
-            return (
-                <div className="max-w-5xl mx-auto">
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 mb-8">
-                        <h2 className="text-2xl font-semibold mb-4">{editingPlayer ? '選手情報を編集' : '新しい選手を追加'}</h2>
-                        <form onSubmit={handleSubmit} className="grid sm:grid-cols-4 gap-4 items-end">
-                            <div><label htmlFor="playerCategory" className="block text-sm font-medium text-gray-400">カテゴリー</label>
-                                <select id="playerCategory" value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">
-                                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                </select>
-                            </div>
-                            <div><label htmlFor="playerName" className="block text-sm font-medium text-gray-400">選手名</label><input type="text" id="playerName" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：山田 太郎" /></div>
-                            <div><label htmlFor="playerNumber" className="block text-sm font-medium text-gray-400">背番号</label><input type="number" id="playerNumber" value={number} onChange={(e) => setNumber(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：10" /></div>
-                            <div className="flex space-x-2">
-                                 <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">{editingPlayer ? '更新' : '追加'}</button>
-                                 {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); setCategory('U12'); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
-                            </div>
-                        </form>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700"><h2 className="text-2xl font-semibold p-6">選手一覧</h2><div className="overflow-x-auto"><table className="w-full text-left">
-                        <thead className="bg-gray-900"><tr>
-                            <th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">カテゴリー</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">背番号</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">選手名</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">操作</th>
-                        </tr></thead>
-                        <tbody className="divide-y divide-gray-700">{sortedPlayers.map(player => (
-                            <tr key={player.id} className="hover:bg-gray-700">
-                                <td className="px-6 py-4">{player.category}</td><td className="px-6 py-4 font-medium">{player.number}</td><td className="px-6 py-4">{player.name}</td>
-                                <td className="px-6 py-4 flex space-x-2">
-                                    <button onClick={() => handleEdit(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
-                                    <button onClick={() => handleDelete(player.id)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
-                                </td>
-                            </tr>
-                        ))}</tbody>
-                    </table></div></div>
-                </div>
-            );
-        }
-
-        function MatchList({ navigate, matches, players, isEditMode }) {
-            const [categoryFilter, setCategoryFilter] = useState('All');
-            const categories = ['All', 'U12', 'U11', 'U10'];
-
-            const getPlayerName = (id) => players.find(p => p.id === id)?.name || '不明';
-            
-            const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
-            
-            const filteredMatches = useMemo(() => {
-                if(categoryFilter === 'All') return sortedMatches;
-                return sortedMatches.filter(match => match.matchCategory === categoryFilter);
-            }, [sortedMatches, categoryFilter]);
-
-            const handleDelete = async (id) => {
-                try { await db.collection(`artifacts/${appId}/public/data/matches`).doc(id).delete(); } 
-                catch (error) { console.error("Error deleting match: ", error); alert("試合記録の削除中にエラーが発生しました。"); }
-            };
-
-            const getFormation = (starters) => {
-                if (!starters || starters.length === 0) return '';
-                const df = starters.filter(s => s.position === 'DF').length;
-                const mf = starters.filter(s => s.position === 'MF').length;
-                const fw = starters.filter(s => s.position === 'FW').length;
-                return `(${df}-${mf}-${fw})`;
-            };
-
-            return (
-                <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
-                    <div className="p-6">
-                        <h2 className="text-2xl font-semibold text-white">試合一覧</h2>
-                        <div className="mt-4 border-b border-gray-700">
-                            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                                {categories.map(cat => (
-                                    <button
-                                        key={cat}
-                                        onClick={() => setCategoryFilter(cat)}
-                                        className={`${
-                                            categoryFilter === cat
-                                                ? 'border-sky-500 text-sky-400'
-                                                : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-                                    >
-                                        {cat}
-                                    </button>
-                                ))}
-                            </nav>
-                        </div>
-                    </div>
-                    <div className="space-y-4 p-6 pt-0">
-                        {filteredMatches.map(match => (
-                            <details key={match.id} className="bg-gray-900 p-4 rounded-lg border border-gray-700">
-                                <summary className="font-semibold cursor-pointer flex justify-between items-center">
-                                    <div className="flex-grow">
-                                        <span className="text-sky-400">{match.date}</span> {match.matchCategory && match.matchCategory !== 'All' && `[${match.matchCategory}] `}{match.tournamentName && `[${match.tournamentName}]`} vs {match.opponent} 
-                                        <span className="ml-4 text-lg font-bold">{match.ownScore} - {match.opponentScore}</span> 
-                                        <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${match.result === '勝利' ? 'bg-green-500 text-white' : match.result === '敗戦' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>
-                                            {match.result}
-                                            {match.pkExists && ` (PK ${match.pkResult === 'PK勝' ? '勝ち' : '負け'})`}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center space-x-2 flex-shrink-0">
-                                        {isEditMode && <>
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('edit-match', match); }} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleDelete(match.id); }} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
-                                        </>}
-                                        <IconChevronDown />
-                                    </div>
-                                </summary>
-                                <div className="mt-4 pt-4 border-t border-gray-700 grid md:grid-cols-2 gap-4 text-sm text-gray-300">
-                                    <div>
-                                        <p><strong>試合形式:</strong> {match.matchType}</p>
-                                        <p><strong>会場:</strong> {match.venue}</p>
-                                        <p><strong>レギュレーション:</strong> {match.regulation} ({match.regulationTime}分)</p>
-                                    </div>
-                                    <div><p><strong>形式:</strong> {match.format}</p><p><strong>天気:</strong> {match.weather}</p></div>
-                                    {match.pkExists && <div className="md:col-span-2"><p><strong>PK戦:</strong> {match.ownPkScore} - {match.opponentPkScore}</p></div>}
-                                    <div className="md:col-span-2"><p><strong>得点者:</strong> {(match.goals || []).map(g => `${getPlayerName(g.scorerId)}${g.assistId ? ` (${getPlayerName(g.assistId)})` : ''}`).join(', ') || 'なし'}</p></div>
-                                    <div className="md:col-span-2">
-                                        <h4 className="font-bold mt-2">スターティングメンバー <span className="text-gray-400 font-normal">(フォーメーション {getFormation(match.starters)})</span></h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1">
-                                            {(match.starters || []).map(s => <p key={s.playerId}>{s.position}: {getPlayerName(s.playerId)}</p>)}
-                                        </div>
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <h4 className="font-bold mt-2">交代選手</h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1">
-                                            {(match.subs || []).map((s, i) => <p key={i}>{getPlayerName(s.playerOut)} → {getPlayerName(s.playerIn)}</p>)}
-                                        </div>
-                                    </div>
-                                </div>
-                            </details>
-                        ))}
-                    </div>
-                </div>
-            );
-        }
-
-        function PlayerStatsList({ playerStats, isEditMode }) {
-            const [sortConfig, setSortConfig] = useState({ key: 'category', direction: 'descending' });
-            const [editingPlayer, setEditingPlayer] = useState(null);
-            
-            const sortedPlayerStats = useMemo(() => {
-                let sortableItems = [...playerStats];
-                if (sortConfig.key) {
-                    sortableItems.sort(function(a, b) {
-                        let valA, valB;
-
-                        if (sortConfig.key === 'category') {
-                            valA = a.category ? parseInt(a.category.replace('U', '')) : 0;
-                            valB = b.category ? parseInt(b.category.replace('U', '')) : 0;
-                        } else {
-                            valA = a[sortConfig.key] || 0;
-                            valB = b[sortConfig.key] || 0;
+                            } catch (error) {
+                                console.error("Authentication failed: ", error);
+                                document.getElementById('root').innerText = "認証エラーが発生しました。ページを再読み込みしてください。";
+                            }
                         }
-
-                        if (valA < valB) {
-                            return sortConfig.direction === 'ascending' ? -1 : 1;
-                        }
-                        if (valA > valB) {
-                            return sortConfig.direction === 'ascending' ? 1 : -1;
-                        }
-                        return 0;
+                        setIsAuthReady(true);
                     });
-                }
-                return sortableItems;
-            }, [playerStats, sortConfig]);
+                    return () => unsubscribe();
+                }, []);
 
-            const requestSort = (key) => {
-                let direction = 'ascending';
-                if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-                    direction = 'descending';
-                }
-                setSortConfig({ key, direction });
-            };
-            const handleUpdateStats = async (playerId, newBaseStats) => {
-                try {
-                    await db.collection(`artifacts/${appId}/public/data/players`).doc(playerId).update({ baseStats: newBaseStats });
-                    setEditingPlayer(null);
-                } catch (error) { console.error("Error updating stats: ", error); alert("成績の更新中にエラーが発生しました。"); }
-            };
-            const columns = [
-                { label: 'カテゴリー', key: 'category' }, { label: '番号', key: 'number' }, { label: '選手名', key: 'name' }, { label: '出場試合', key: 'totalMatchesPlayed' },
-                { label: '得点', key: 'totalGoals' }, { label: 'アシスト', key: 'totalAssists' },
-                { label: '警告', key: 'totalCautions' }, { label: '退場', key: 'totalEjections' }
-            ];
-            if (isEditMode) columns.push({ label: '操作', key: 'actions' });
+                // --- データ取得 (新しい方式) ---
+                useEffect(() => {
+                    if (!isAuthReady || !db) return;
+                    
+                    const playersCollectionPath = `artifacts/${appId}/public/data/players`;
+                    const matchesCollectionPath = `artifacts/${appId}/public/data/matches`;
 
-            return (
-                <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
-                    <h2 className="text-2xl font-semibold p-6">選手成績一覧</h2>
-                    <div className="overflow-y-auto max-h-[calc(100vh-16rem)]">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-900 sticky top-0">
-                                <tr>{columns.map(col => (
-                                    <th key={col.key} className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wider cursor-pointer" onClick={() => col.key !== 'actions' && requestSort(col.key)}>
-                                        {col.label} {sortConfig.key === col.key && (sortConfig.direction === 'ascending' ? ' ▲' : ' ▼')}
-                                    </th>
-                                ))}</tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-700">{sortedPlayerStats.map(player => (
+                    const playersQuery = window.firebaseTools.collection(db, playersCollectionPath);
+                    const matchesQuery = window.firebaseTools.collection(db, matchesCollectionPath);
+
+                    const unsubPlayers = window.firebaseTools.onSnapshot(playersQuery, 
+                        (snap) => setPlayers(snap.docs.map(d => ({id: d.id, ...d.data()}))), 
+                        (e) => console.error("Player fetch error", e)
+                    );
+                    const unsubMatches = window.firebaseTools.onSnapshot(matchesQuery, 
+                        (snap) => setMatches(snap.docs.map(d => ({id: d.id, ...d.data()}))), 
+                        (e) => console.error("Match fetch error", e)
+                    );
+
+                    return () => { unsubPlayers(); unsubMatches(); };
+                }, [isAuthReady]);
+
+                const navigate = (pageName, data = null) => {
+                    if (pageName.includes('add') || pageName.includes('edit') || pageName.includes('management')) {
+                        if (!isEditMode) { setShowPasswordModal(true); return; }
+                    }
+                    if (pageName === 'edit-match') setEditingMatch(data);
+                    else setEditingMatch(null);
+                    setPage(pageName);
+                };
+                
+                const handlePasswordSubmit = (password) => {
+                    if (password === 'soccer') { setIsEditMode(true); setShowPasswordModal(false); } 
+                    else { 
+                      // alert()は環境によっては表示されないため、モーダル内でエラー表示するのが望ましい
+                      // ここでは簡易的にconsole.errorを使用
+                      console.error('合言葉が違います。');
+                    }
+                };
+
+                const logout = () => { setIsEditMode(false); setPage('dashboard'); };
+
+                const playerStats = useMemo(() => {
+                    return players.map(player => {
+                        const base = player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+                        const calc = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+                        matches.forEach(m => {
+                            const isStarter = (m.starters || []).some(s => s.playerId === player.id);
+                            const isSub = (m.subs || []).some(s => s.playerIn === player.id);
+                            if (isStarter || isSub) {
+                                calc.matchesPlayed++;
+                            }
+                            (m.goals || []).forEach(g => {
+                                if (g.scorerId === player.id) calc.goals++;
+                                if (g.assistId === player.id) calc.assists++;
+                            });
+                            (m.cautions || []).forEach(c => { if (c.playerId === player.id) calc.cautions++; });
+                            (m.ejections || []).forEach(e => { if (e.playerId === player.id) calc.ejections++; });
+                        });
+                        return {
+                            ...player,
+                            totalMatchesPlayed: (base.matchesPlayed || 0) + calc.matchesPlayed,
+                            totalGoals: (base.goals || 0) + calc.goals,
+                            totalAssists: (base.assists || 0) + calc.assists,
+                            totalCautions: (base.cautions || 0) + calc.cautions,
+                            totalEjections: (base.ejections || 0) + calc.ejections,
+                        };
+                    });
+                }, [players, matches]);
+                
+                const renderPage = () => {
+                    switch (page) {
+                        case 'dashboard': return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode} />;
+                        case 'rankings': return <RankingsPage playerStats={playerStats} matches={matches} players={players} />;
+                        case 'match-list': return <MatchList navigate={navigate} matches={matches} players={players} isEditMode={isEditMode} />;
+                        case 'player-management': return <PlayerManagement players={players} />;
+                        case 'add-match': return <MatchForm navigate={navigate} players={players} />;
+                        case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
+                        case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} />;
+                        default: return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode}/>;
+                    }
+                };
+
+                if (!isAuthReady) return <div className="flex justify-center items-center h-screen bg-gray-800"><div className="text-xl font-semibold text-white">読み込み中...</div></div>;
+
+                return (
+                    <div className="bg-gray-900 min-h-screen font-sans text-white">
+                        <Header navigate={navigate} isEditMode={isEditMode} onEditModeToggle={() => setShowPasswordModal(true)} onLogout={logout} />
+                        <main className="p-4 sm:p-8">{renderPage()}</main>
+                        {showPasswordModal && <PasswordModal onSubmit={handlePasswordSubmit} onClose={() => setShowPasswordModal(false)} />}
+                    </div>
+                );
+            }
+
+            // --- PlayerManagement コンポーネント (DB操作を新しい方式に更新) ---
+            function PlayerManagement({ players }) {
+                const [name, setName] = useState('');
+                const [number, setNumber] = useState('');
+                const [category, setCategory] = useState('U12');
+                const [editingPlayer, setEditingPlayer] = useState(null);
+                const categories = ['U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
+                
+                const playersCollectionRef = window.firebaseTools.collection(db, `artifacts/${appId}/public/data/players`);
+
+                const handleSubmit = async (e) => {
+                    e.preventDefault();
+                    if (!name || !number || !category) { 
+                        console.error("カテゴリー、選手名、背番号を入力してください。");
+                        return;
+                    }
+                    const playerData = { name, number: parseInt(number, 10), category };
+                    
+                    try {
+                        if (editingPlayer) {
+                            const playerDocRef = window.firebaseTools.doc(playersCollectionRef, editingPlayer.id);
+                            await window.firebaseTools.updateDoc(playerDocRef, playerData);
+                            setEditingPlayer(null);
+                        } else {
+                            playerData.baseStats = { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 };
+                            await window.firebaseTools.addDoc(playersCollectionRef, playerData);
+                        }
+                        setName(''); setNumber(''); setCategory('U12');
+                    } catch (error) {
+                        console.error("Error saving player: ", error);
+                    }
+                };
+
+                const handleEdit = (player) => { 
+                    setEditingPlayer(player); 
+                    setName(player.name); 
+                    setNumber(player.number); 
+                    setCategory(player.category || 'U12');
+                };
+
+                const handleDelete = async (id) => {
+                    try {
+                        const playerDocRef = window.firebaseTools.doc(playersCollectionRef, id);
+                        await window.firebaseTools.deleteDoc(playerDocRef);
+                    } catch (error) { 
+                        console.error("Error deleting player: ", error);
+                    }
+                };
+                
+                const sortedPlayers = [...players].sort((a,b) => a.number - b.number);
+
+                return (
+                    <div className="max-w-5xl mx-auto">
+                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 mb-8">
+                            <h2 className="text-2xl font-semibold mb-4">{editingPlayer ? '選手情報を編集' : '新しい選手を追加'}</h2>
+                            <form onSubmit={handleSubmit} className="grid sm:grid-cols-4 gap-4 items-end">
+                                <div><label htmlFor="playerCategory" className="block text-sm font-medium text-gray-400">カテゴリー</label>
+                                    <select id="playerCategory" value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
+                                </div>
+                                <div><label htmlFor="playerName" className="block text-sm font-medium text-gray-400">選手名</label><input type="text" id="playerName" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：山田 太郎" /></div>
+                                <div><label htmlFor="playerNumber" className="block text-sm font-medium text-gray-400">背番号</label><input type="number" id="playerNumber" value={number} onChange={(e) => setNumber(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：10" /></div>
+                                <div className="flex space-x-2">
+                                    <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">{editingPlayer ? '更新' : '追加'}</button>
+                                    {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); setCategory('U12'); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
+                                </div>
+                            </form>
+                        </div>
+                        <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700"><h2 className="text-2xl font-semibold p-6">選手一覧</h2><div className="overflow-x-auto"><table className="w-full text-left">
+                            <thead className="bg-gray-900"><tr>
+                                <th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">カテゴリー</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">背番号</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">選手名</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">操作</th>
+                            </tr></thead>
+                            <tbody className="divide-y divide-gray-700">{sortedPlayers.map(player => (
                                 <tr key={player.id} className="hover:bg-gray-700">
-                                    {columns.map(col => <td key={col.key} className={`px-6 py-4 ${col.key === 'name' ? 'font-bold' : ''}`}>
-                                        {col.key === 'actions' ? 
-                                            <button onClick={() => setEditingPlayer(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button> :
-                                            player[col.key]
-                                        }
-                                    </td>)}
+                                    <td className="px-6 py-4">{player.category}</td><td className="px-6 py-4 font-medium">{player.number}</td><td className="px-6 py-4">{player.name}</td>
+                                    <td className="px-6 py-4 flex space-x-2">
+                                        <button onClick={() => handleEdit(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
+                                        <button onClick={() => handleDelete(player.id)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
+                                    </td>
                                 </tr>
                             ))}</tbody>
-                        </table>
+                        </table></div></div>
                     </div>
-                    {editingPlayer && <EditStatsModal player={editingPlayer} onSave={handleUpdateStats} onClose={() => setEditingPlayer(null)} />}
-                </div>
-            );
-        }
-        
-        function MatchForm({ navigate, players, existingMatch }) {
-            const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'U12', regulation: '前後半', regulationTime: 20 };
-            const [match, setMatch] = useState(initialMatchState);
-            const [selectedCategories, setSelectedCategories] = useState(['All']);
-            const categories = ['All', 'U12', 'U11', 'U10'];
-            const positions = ['GK', 'DF', 'MF', 'FW', 'FP'];
+                );
+            }
 
-            useEffect(() => {
-                const starterLimits = { '8人制': 8, '11人制': 11, 'フットサル': 5 };
-                const requiredStarters = starterLimits[match.format];
+            // --- MatchList コンポーネント (DB操作を新しい方式に更新) ---
+            function MatchList({ navigate, matches, players, isEditMode }) {
+                const [categoryFilter, setCategoryFilter] = useState('All');
+                const categories = ['All', 'U12', 'U11', 'U10'];
+                const matchesCollectionRef = window.firebaseTools.collection(db, `artifacts/${appId}/public/data/matches`);
+
+                const getPlayerName = (id) => players.find(p => p.id === id)?.name || '不明';
                 
-                let currentStarters = match.starters || [];
-                if (requiredStarters && currentStarters.length !== requiredStarters) {
-                    const newStarters = Array(requiredStarters).fill(null).map((_, i) =>
-                        currentStarters[i] || { position: 'FP', playerId: '' }
-                    );
-                    setMatch(prev => ({...prev, starters: newStarters.slice(0, requiredStarters)}));
-                } else if (!requiredStarters) {
-                    setMatch(prev => ({...prev, starters: []}));
-                }
-            }, [match.format]);
+                const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
+                
+                const filteredMatches = useMemo(() => {
+                    if(categoryFilter === 'All') return sortedMatches;
+                    return sortedMatches.filter(match => match.matchCategory === categoryFilter);
+                }, [sortedMatches, categoryFilter]);
 
-            useEffect(() => {
-                if (existingMatch) {
-                    setMatch(prev => ({ ...initialMatchState, ...existingMatch }));
-                    if(existingMatch.matchCategories) {
-                        setSelectedCategories(existingMatch.matchCategories);
+                const handleDelete = async (id) => {
+                    try {
+                        const matchDocRef = window.firebaseTools.doc(matchesCollectionRef, id);
+                        await window.firebaseTools.deleteDoc(matchDocRef);
+                    } catch (error) { 
+                        console.error("Error deleting match: ", error);
                     }
-                } else {
-                    setMatch(initialMatchState);
-                    setSelectedCategories(['All']);
-                }
-            }, [existingMatch]);
-            
-            const handleCategoryChange = (category) => {
-                setSelectedCategories(prev => {
-                    if (category === 'All') {
-                        return prev.includes('All') ? [] : ['All'];
-                    }
-                    let newSelection = prev.filter(c => c !== 'All');
-                    if (newSelection.includes(category)) {
-                        newSelection = newSelection.filter(c => c !== category);
-                    } else {
-                        newSelection.push(category);
-                    }
-                    if (newSelection.length === 0) {
-                        return ['All'];
-                    }
-                    return newSelection;
-                });
-            };
+                };
 
-            const filteredPlayers = useMemo(() => {
-                let playersToShow = [];
-                if (selectedCategories.includes('All')) {
-                    playersToShow = players;
-                } else {
-                    const playersSet = new Set();
-                    selectedCategories.forEach(cat => {
-                        if (cat === 'U10') {
-                            players.forEach(p => {
-                                if (!p.category) return;
-                                const playerAge = parseInt(p.category.replace('U', ''));
-                                if (playerAge <= 10) {
-                                    playersSet.add(p);
-                                }
-                            });
-                        } else {
-                            players.forEach(p => {
-                                if (p.category === cat) {
-                                    playersSet.add(p);
-                                }
-                            });
+                const getFormation = (starters) => {
+                    if (!starters || starters.length === 0) return '';
+                    const df = starters.filter(s => s.position === 'DF').length;
+                    const mf = starters.filter(s => s.position === 'MF').length;
+                    const fw = starters.filter(s => s.position === 'FW').length;
+                    return `(${df}-${mf}-${fw})`;
+                };
+
+                // (MatchListのJSXは変更がないため省略、元のコードをそのまま使用)
+                return (
+                    <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
+                        <div className="p-6">
+                            <h2 className="text-2xl font-semibold text-white">試合一覧</h2>
+                            <div className="mt-4 border-b border-gray-700">
+                                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                                    {categories.map(cat => (
+                                        <button
+                                            key={cat}
+                                            onClick={() => setCategoryFilter(cat)}
+                                            className={`${
+                                                categoryFilter === cat
+                                                    ? 'border-sky-500 text-sky-400'
+                                                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
+                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </nav>
+                            </div>
+                        </div>
+                        <div className="space-y-4 p-6 pt-0">
+                            {filteredMatches.map(match => (
+                                <details key={match.id} className="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                                    <summary className="font-semibold cursor-pointer flex justify-between items-center">
+                                        <div className="flex-grow">
+                                            <span className="text-sky-400">{match.date}</span> {match.matchCategory && match.matchCategory !== 'All' && `[${match.matchCategory}] `}{match.tournamentName && `[${match.tournamentName}]`} vs {match.opponent} 
+                                            <span className="ml-4 text-lg font-bold">{match.ownScore} - {match.opponentScore}</span> 
+                                            <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${match.result === '勝利' ? 'bg-green-500 text-white' : match.result === '敗戦' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>
+                                                {match.result}
+                                                {match.pkExists && ` (PK ${match.pkResult === 'PK勝' ? '勝ち' : '負け'})`}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center space-x-2 flex-shrink-0">
+                                            {isEditMode && <>
+                                                <button onClick={(e) => { e.stopPropagation(); navigate('edit-match', match); }} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDelete(match.id); }} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
+                                            </>}
+                                            <IconChevronDown />
+                                        </div>
+                                    </summary>
+                                    <div className="mt-4 pt-4 border-t border-gray-700 grid md:grid-cols-2 gap-4 text-sm text-gray-300">
+                                        <div>
+                                            <p><strong>試合形式:</strong> {match.matchType}</p>
+                                            <p><strong>会場:</strong> {match.venue}</p>
+                                            <p><strong>レギュレーション:</strong> {match.regulation} ({match.regulationTime}分)</p>
+                                        </div>
+                                        <div><p><strong>形式:</strong> {match.format}</p><p><strong>天気:</strong> {match.weather}</p></div>
+                                        {match.pkExists && <div className="md:col-span-2"><p><strong>PK戦:</strong> {match.ownPkScore} - {match.opponentPkScore}</p></div>}
+                                        <div className="md:col-span-2"><p><strong>得点者:</strong> {(match.goals || []).map(g => `${getPlayerName(g.scorerId)}${g.assistId ? ` (${getPlayerName(g.assistId)})` : ''}`).join(', ') || 'なし'}</p></div>
+                                        <div className="md:col-span-2">
+                                            <h4 className="font-bold mt-2">スターティングメンバー <span className="text-gray-400 font-normal">(フォーメーション {getFormation(match.starters)})</span></h4>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1">
+                                                {(match.starters || []).map(s => <p key={s.playerId}>{s.position}: {getPlayerName(s.playerId)}</p>)}
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <h4 className="font-bold mt-2">交代選手</h4>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1">
+                                                {(match.subs || []).map((s, i) => <p key={i}>{getPlayerName(s.playerOut)} → {getPlayerName(s.playerIn)}</p>)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </details>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            // --- PlayerStatsList コンポーネント (DB操作を新しい方式に更新) ---
+            function PlayerStatsList({ playerStats, isEditMode }) {
+                const [sortConfig, setSortConfig] = useState({ key: 'category', direction: 'descending' });
+                const [editingPlayer, setEditingPlayer] = useState(null);
+                
+                const sortedPlayerStats = useMemo(() => {
+                    let sortableItems = [...playerStats];
+                    if (sortConfig.key) {
+                        sortableItems.sort(function(a, b) {
+                            let valA, valB;
+
+                            if (sortConfig.key === 'category') {
+                                valA = a.category ? parseInt(a.category.replace('U', '')) : 0;
+                                valB = b.category ? parseInt(b.category.replace('U', '')) : 0;
+                            } else {
+                                valA = a[sortConfig.key] || 0;
+                                valB = b[sortConfig.key] || 0;
+                            }
+
+                            if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
+                            if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
+                            return 0;
+                        });
+                    }
+                    return sortableItems;
+                }, [playerStats, sortConfig]);
+
+                const requestSort = (key) => {
+                    let direction = 'ascending';
+                    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+                        direction = 'descending';
+                    }
+                    setSortConfig({ key, direction });
+                };
+
+                const handleUpdateStats = async (playerId, newBaseStats) => {
+                    try {
+                        const playerDocRef = window.firebaseTools.doc(db, `artifacts/${appId}/public/data/players`, playerId);
+                        await window.firebaseTools.updateDoc(playerDocRef, { baseStats: newBaseStats });
+                        setEditingPlayer(null);
+                    } catch (error) { 
+                        console.error("Error updating stats: ", error);
+                    }
+                };
+
+                const columns = [
+                    { label: 'カテゴリー', key: 'category' }, { label: '番号', key: 'number' }, { label: '選手名', key: 'name' }, { label: '出場試合', key: 'totalMatchesPlayed' },
+                    { label: '得点', key: 'totalGoals' }, { label: 'アシスト', key: 'totalAssists' },
+                    { label: '警告', key: 'totalCautions' }, { label: '退場', key: 'totalEjections' }
+                ];
+                if (isEditMode) columns.push({ label: '操作', key: 'actions' });
+                
+                // (PlayerStatsListのJSXは変更がないため省略、元のコードをそのまま使用)
+                return (
+                    <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+                        <h2 className="text-2xl font-semibold p-6">選手成績一覧</h2>
+                        <div className="overflow-y-auto max-h-[calc(100vh-16rem)]">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-900 sticky top-0">
+                                    <tr>{columns.map(col => (
+                                        <th key={col.key} className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wider cursor-pointer" onClick={() => col.key !== 'actions' && requestSort(col.key)}>
+                                            {col.label} {sortConfig.key === col.key && (sortConfig.direction === 'ascending' ? ' ▲' : ' ▼')}
+                                        </th>
+                                    ))}</tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-700">{sortedPlayerStats.map(player => (
+                                    <tr key={player.id} className="hover:bg-gray-700">
+                                        {columns.map(col => <td key={col.key} className={`px-6 py-4 ${col.key === 'name' ? 'font-bold' : ''}`}>
+                                            {col.key === 'actions' ? 
+                                                <button onClick={() => setEditingPlayer(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button> :
+                                                player[col.key]
+                                            }
+                                        </td>)}
+                                    </tr>
+                                ))}</tbody>
+                            </table>
+                        </div>
+                        {editingPlayer && <EditStatsModal player={editingPlayer} onSave={handleUpdateStats} onClose={() => setEditingPlayer(null)} />}
+                    </div>
+                );
+            }
+
+            // --- MatchForm コンポーネント (DB操作を新しい方式に更新) ---
+            function MatchForm({ navigate, players, existingMatch }) {
+                // ... (MatchFormの内部ロジックは長いため、変更点のみコメント)
+                const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'U12', regulation: '前後半', regulationTime: 20 };
+                const [match, setMatch] = useState(initialMatchState);
+                const [selectedCategories, setSelectedCategories] = useState(['All']);
+                const categories = ['All', 'U12', 'U11', 'U10'];
+                const positions = ['GK', 'DF', 'MF', 'FW', 'FP'];
+
+                useEffect(() => {
+                    const starterLimits = { '8人制': 8, '11人制': 11, 'フットサル': 5 };
+                    const requiredStarters = starterLimits[match.format];
+                    
+                    let currentStarters = match.starters || [];
+                    if (requiredStarters && currentStarters.length !== requiredStarters) {
+                        const newStarters = Array(requiredStarters).fill(null).map((_, i) =>
+                            currentStarters[i] || { position: 'FP', playerId: '' }
+                        );
+                        setMatch(prev => ({...prev, starters: newStarters.slice(0, requiredStarters)}));
+                    } else if (!requiredStarters) {
+                        setMatch(prev => ({...prev, starters: []}));
+                    }
+                }, [match.format]);
+
+                useEffect(() => {
+                    if (existingMatch) {
+                        setMatch(prev => ({ ...initialMatchState, ...existingMatch }));
+                        if(existingMatch.matchCategories) {
+                            setSelectedCategories(existingMatch.matchCategories);
                         }
+                    } else {
+                        setMatch(initialMatchState);
+                        setSelectedCategories(['All']);
+                    }
+                }, [existingMatch]);
+                
+                const handleCategoryChange = (category) => {
+                    setSelectedCategories(prev => {
+                        if (category === 'All') {
+                            return prev.includes('All') ? [] : ['All'];
+                        }
+                        let newSelection = prev.filter(c => c !== 'All');
+                        if (newSelection.includes(category)) {
+                            newSelection = newSelection.filter(c => c !== category);
+                        } else {
+                            newSelection.push(category);
+                        }
+                        if (newSelection.length === 0) {
+                            return ['All'];
+                        }
+                        return newSelection;
                     });
-                    playersToShow = Array.from(playersSet);
-                }
-                return playersToShow.sort((a, b) => a.number - b.number);
-            }, [players, selectedCategories]);
-
-            const handleChange = (e) => { 
-                const { name, value, type, checked } = e.target;
-                setMatch(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value })); 
-            };
-
-            const handleStarterChange = (index, field, value) => {
-                setMatch(prev => {
-                    const newStarters = [...prev.starters];
-                    newStarters[index][field] = value;
-                    return { ...prev, starters: newStarters };
-                });
-            };
-            const addStarter = () => setMatch(prev => ({ ...prev, starters: [...(prev.starters || []), { position: 'FP', playerId: '' }] }));
-            const removeStarter = (index) => setMatch(prev => ({ ...prev, starters: prev.starters.filter((_, i) => i !== index) }));
-
-            const handleSubChange = (index, field, value) => {
-                setMatch(prev => {
-                    const newSubs = [...prev.subs];
-                    newSubs[index][field] = value;
-                    return { ...prev, subs: newSubs };
-                });
-            };
-            const addSub = () => setMatch(prev => ({ ...prev, subs: [...(prev.subs || []), { playerOut: '', playerIn: '' }] }));
-            const removeSub = (index) => setMatch(prev => ({ ...prev, subs: prev.subs.filter((_, i) => i !== index) }));
-            
-            const addGoal = () => setMatch(prev => ({ ...prev, goals: [...(prev.goals || []), { scorerId: '', assistId: '' }] }));
-            const handleGoalChange = (index, field, value) => setMatch(prev => { const newGoals = [...prev.goals]; newGoals[index][field] = value; return { ...prev, goals: newGoals }; });
-            const removeGoal = (index) => setMatch(prev => ({ ...prev, goals: prev.goals.filter((_, i) => i !== index) }));
-            const addCard = (type) => setMatch(prev => ({ ...prev, [type]: [...(prev[type] || []), { playerId: '' }] }));
-            const handleCardChange = (type, index, value) => setMatch(prev => { const newCards = [...prev[type]]; newCards[index].playerId = value; return { ...prev, [type]: newCards }; });
-            const removeCard = (type, index) => setMatch(prev => ({ ...prev, [type]: prev[type].filter((_, i) => i !== index) }));
-            
-            const handleSubmit = async (e) => {
-                e.preventDefault();
+                };
                 
-                const starterPlayerIds = (match.starters || []).map(s => s.playerId).filter(Boolean);
-                const starterLimits = { '8人制': 8, '11人制': 11, 'フットサル': 5 };
-                const requiredStarters = starterLimits[match.format];
+                const filteredPlayers = useMemo(() => {
+                    let playersToShow = [];
+                    if (selectedCategories.includes('All')) {
+                        playersToShow = players;
+                    } else {
+                        const playersSet = new Set();
+                        selectedCategories.forEach(cat => {
+                            if (cat === 'U10') {
+                                players.forEach(p => {
+                                    if (!p.category) return;
+                                    const playerAge = parseInt(p.category.replace('U', ''));
+                                    if (playerAge <= 10) {
+                                        playersSet.add(p);
+                                    }
+                                });
+                            } else {
+                                players.forEach(p => {
+                                    if (p.category === cat) {
+                                        playersSet.add(p);
+                                    }
+                                });
+                            }
+                        });
+                        playersToShow = Array.from(playersSet);
+                    }
+                    return playersToShow.sort((a, b) => a.number - b.number);
+                }, [players, selectedCategories]);
+
+                const handleChange = (e) => { 
+                    const { name, value, type, checked } = e.target;
+                    setMatch(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value })); 
+                };
+
+                const handleStarterChange = (index, field, value) => {
+                    setMatch(prev => {
+                        const newStarters = [...prev.starters];
+                        newStarters[index][field] = value;
+                        return { ...prev, starters: newStarters };
+                    });
+                };
+                const addStarter = () => setMatch(prev => ({ ...prev, starters: [...(prev.starters || []), { position: 'FP', playerId: '' }] }));
+                const removeStarter = (index) => setMatch(prev => ({ ...prev, starters: prev.starters.filter((_, i) => i !== index) }));
+
+                const handleSubChange = (index, field, value) => {
+                    setMatch(prev => {
+                        const newSubs = [...prev.subs];
+                        newSubs[index][field] = value;
+                        return { ...prev, subs: newSubs };
+                    });
+                };
+                const addSub = () => setMatch(prev => ({ ...prev, subs: [...(prev.subs || []), { playerOut: '', playerIn: '' }] }));
+                const removeSub = (index) => setMatch(prev => ({ ...prev, subs: prev.subs.filter((_, i) => i !== index) }));
                 
-                if (requiredStarters && starterPlayerIds.length !== requiredStarters) {
-                    alert(`${match.format}の試合では、先発選手を${requiredStarters}人選択してください。`);
-                    return;
-                }
+                const addGoal = () => setMatch(prev => ({ ...prev, goals: [...(prev.goals || []), { scorerId: '', assistId: '' }] }));
+                const handleGoalChange = (index, field, value) => setMatch(prev => { const newGoals = [...prev.goals]; newGoals[index][field] = value; return { ...prev, goals: newGoals }; });
+                const removeGoal = (index) => setMatch(prev => ({ ...prev, goals: prev.goals.filter((_, i) => i !== index) }));
+                const addCard = (type) => setMatch(prev => ({ ...prev, [type]: [...(prev[type] || []), { playerId: '' }] }));
+                const handleCardChange = (type, index, value) => setMatch(prev => { const newCards = [...prev[type]]; newCards[index].playerId = value; return { ...prev, [type]: newCards }; });
+                const removeCard = (type, index) => setMatch(prev => ({ ...prev, [type]: prev[type].filter((_, i) => i !== index) }));
+                
+                const handleSubmit = async (e) => {
+                    e.preventDefault();
 
-                const path = `artifacts/${appId}/public/data/matches`;
-                const data = { ...match, ownScore: parseInt(match.ownScore, 10) || 0, opponentScore: parseInt(match.opponentScore, 10) || 0, ownPkScore: parseInt(match.ownPkScore, 10) || 0, opponentPkScore: parseInt(match.opponentPkScore, 10) || 0, matchCategories: selectedCategories };
-                try {
-                    if (existingMatch) await db.collection(path).doc(existingMatch.id).update(data);
-                    else await db.collection(path).add(data);
-                    alert(existingMatch ? "試合結果を更新しました。" : "試合結果を保存しました。");
-                    navigate('match-list');
-                } catch (error) { console.error("Error saving document: ", error); alert("保存中にエラーが発生しました。"); }
-            };
+                    const starterPlayerIds = (match.starters || []).map(s => s.playerId).filter(Boolean);
+                    const starterLimits = { '8人制': 8, '11人制': 11, 'フットサル': 5 };
+                    const requiredStarters = starterLimits[match.format];
+                    
+                    if (requiredStarters && starterPlayerIds.length !== requiredStarters) {
+                        console.error(`${match.format}の試合では、先発選手を${requiredStarters}人選択してください。`);
+                        return;
+                    }
 
-            const participatingPlayers = useMemo(() => {
-                const starterIds = (match.starters || []).map(s => s.playerId);
-                const subInIds = (match.subs || []).map(s => s.playerIn);
-                const allIds = [...new Set([...starterIds, ...subInIds])];
-                return players.filter(p => allIds.includes(p.id));
-            }, [players, match.starters, match.subs]);
+                    const path = `artifacts/${appId}/public/data/matches`;
+                    const matchesCollectionRef = window.firebaseTools.collection(db, path);
+                    const data = { ...match, ownScore: parseInt(match.ownScore, 10) || 0, opponentScore: parseInt(match.opponentScore, 10) || 0, ownPkScore: parseInt(match.ownPkScore, 10) || 0, opponentPkScore: parseInt(match.opponentPkScore, 10) || 0, matchCategories: selectedCategories };
 
-            const availableStarters = (currentIndex) => {
-                const selectedIds = (match.starters || []).map((s, i) => i !== currentIndex ? s.playerId : null).filter(Boolean);
-                return filteredPlayers.filter(p => !selectedIds.includes(p.id));
-            };
+                    try {
+                        if (existingMatch) {
+                            const matchDocRef = window.firebaseTools.doc(matchesCollectionRef, existingMatch.id);
+                            await window.firebaseTools.updateDoc(matchDocRef, data);
+                        } else {
+                            await window.firebaseTools.addDoc(matchesCollectionRef, data);
+                        }
+                        navigate('match-list');
+                    } catch (error) { 
+                        console.error("Error saving document: ", error);
+                    }
+                };
 
-            return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6">
-                <InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required />
-                <SelectField label="試合のカテゴリー" name="matchCategory" value={match.matchCategory} onChange={handleChange} options={['U12', 'U11', 'U10', 'その他']} />
-                <SelectField label="試合形式" name="matchType" value={match.matchType} onChange={handleChange} options={['TRM', '公式戦', 'カップ戦', 'その他']} />
-                {(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}
-                <InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required />
-                <InputField label="会場" name="venue" value={match.venue} onChange={handleChange} placeholder="例：〇〇グラウンド" />
-                <SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['-', '8人制', '11人制', 'フットサル', 'その他']} />
-                <SelectField label="天気" name="weather" value={match.weather} onChange={handleChange} options={['晴れ', '曇り', '雨', '雪']} />
-                <SelectField label="結果" name="result" value={match.result} onChange={handleChange} options={['勝利', '敗戦', '引分']} />
-                <InputField label="自チーム得点" type="number" name="ownScore" value={match.ownScore} onChange={handleChange} />
-                <InputField label="相手チーム得点" type="number" name="opponentScore" value={match.opponentScore} onChange={handleChange} />
-                <div className="md:col-span-2 grid grid-cols-2 gap-4">
-                    <SelectField label="試合レギュレーション" name="regulation" value={match.regulation} onChange={handleChange} options={['前後半', '3ピリオド', '1本']} />
-                    <InputField label={match.regulation === '前後半' ? '時間（分ハーフ）' : '時間（分）'} type="number" name="regulationTime" value={match.regulationTime} onChange={handleChange} />
-                </div>
-                {match.result === '引分' && (
-                    <div className="md:col-span-2 bg-gray-900 p-4 rounded-lg space-y-4">
-                        <label className="flex items-center space-x-3"><input type="checkbox" name="pkExists" checked={match.pkExists || false} onChange={handleChange} className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500" /><span>PK戦あり</span></label>
-                        {match.pkExists && (
-                            <div className="grid grid-cols-3 gap-4">
-                                <InputField label="自チームPK得点" type="number" name="ownPkScore" value={match.ownPkScore || 0} onChange={handleChange} />
-                                <InputField label="相手PK得点" type="number" name="opponentPkScore" value={match.opponentPkScore || 0} onChange={handleChange} />
-                                <SelectField label="PK戦結果" name="pkResult" value={match.pkResult || 'PK勝'} onChange={handleChange} options={['PK勝', 'PK敗']} />
+                const participatingPlayers = useMemo(() => {
+                    const starterIds = (match.starters || []).map(s => s.playerId);
+                    const subInIds = (match.subs || []).map(s => s.playerIn);
+                    const allIds = [...new Set([...starterIds, ...subInIds])];
+                    return players.filter(p => allIds.includes(p.id));
+                }, [players, match.starters, match.subs]);
+
+                const availableStarters = (currentIndex) => {
+                    const selectedIds = (match.starters || []).map((s, i) => i !== currentIndex ? s.playerId : null).filter(Boolean);
+                    return filteredPlayers.filter(p => !selectedIds.includes(p.id));
+                };
+
+                // (MatchFormのJSXは変更がないため省略、元のコードをそのまま使用)
+                return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6">
+                    <InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required />
+                    <SelectField label="試合のカテゴリー" name="matchCategory" value={match.matchCategory} onChange={handleChange} options={['U12', 'U11', 'U10', 'その他']} />
+                    <SelectField label="試合形式" name="matchType" value={match.matchType} onChange={handleChange} options={['TRM', '公式戦', 'カップ戦', 'その他']} />
+                    {(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}
+                    <InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required />
+                    <InputField label="会場" name="venue" value={match.venue} onChange={handleChange} placeholder="例：〇〇グラウンド" />
+                    <SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['-', '8人制', '11人制', 'フットサル', 'その他']} />
+                    <SelectField label="天気" name="weather" value={match.weather} onChange={handleChange} options={['晴れ', '曇り', '雨', '雪']} />
+                    <SelectField label="結果" name="result" value={match.result} onChange={handleChange} options={['勝利', '敗戦', '引分']} />
+                    <InputField label="自チーム得点" type="number" name="ownScore" value={match.ownScore} onChange={handleChange} />
+                    <InputField label="相手チーム得点" type="number" name="opponentScore" value={match.opponentScore} onChange={handleChange} />
+                    <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                        <SelectField label="試合レギュレーション" name="regulation" value={match.regulation} onChange={handleChange} options={['前後半', '3ピリオド', '1本']} />
+                        <InputField label={match.regulation === '前後半' ? '時間（分ハーフ）' : '時間（分）'} type="number" name="regulationTime" value={match.regulationTime} onChange={handleChange} />
+                    </div>
+                    {match.result === '引分' && (
+                        <div className="md:col-span-2 bg-gray-900 p-4 rounded-lg space-y-4">
+                            <label className="flex items-center space-x-3"><input type="checkbox" name="pkExists" checked={match.pkExists || false} onChange={handleChange} className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500" /><span>PK戦あり</span></label>
+                            {match.pkExists && (
+                                <div className="grid grid-cols-3 gap-4">
+                                    <InputField label="自チームPK得点" type="number" name="ownPkScore" value={match.ownPkScore || 0} onChange={handleChange} />
+                                    <InputField label="相手PK得点" type="number" name="opponentPkScore" value={match.opponentPkScore || 0} onChange={handleChange} />
+                                    <SelectField label="PK戦結果" name="pkResult" value={match.pkResult || 'PK勝'} onChange={handleChange} options={['PK勝', 'PK敗']} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div></FormSection>
+                <FormSection title="出場選手">
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-400">出場選手カテゴリーで絞り込み</label>
+                        <div className="flex flex-wrap gap-4 mt-2">
+                            {categories.map(cat => (
+                                <label key={cat} className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedCategories.includes(cat)}
+                                        onChange={() => handleCategoryChange(cat)}
+                                        className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500"
+                                    />
+                                    <span>{cat}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-8">
+                        <div>
+                            <h4 className="font-semibold text-gray-300 mb-3">先発出場選手</h4>
+                            <div className="space-y-2">
+                                {(match.starters || []).map((starter, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <SelectField label="" name="position" value={starter.position} onChange={(e) => handleStarterChange(index, 'position', e.target.value)} options={positions} />
+                                        <SelectField label="" name="playerId" value={starter.playerId} onChange={(e) => handleStarterChange(index, 'playerId', e.target.value)} options={availableStarters(index).map(p => ({ value: p.id, label: `${p.number} ${p.name}`}))} defaultOption="選手を選択" />
+                                        <button type="button" onClick={() => removeStarter(index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
+                                    </div>
+                                ))}
+                                {(match.format === 'その他') && <button type="button" onClick={addStarter} className="text-sm text-sky-400 hover:underline">先発選手を追加</button>}
+                            </div>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-gray-300 mb-3">途中出場選手</h4>
+                            <div className="space-y-2">
+                                {(match.subs || []).map((sub, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <SelectField label="" name="playerOut" value={sub.playerOut} onChange={(e) => handleSubChange(index, 'playerOut', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="OUT" />
+                                        <SelectField label="" name="playerIn" value={sub.playerIn} onChange={(e) => handleSubChange(index, 'playerIn', e.target.value)} options={filteredPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}`}))} defaultOption="IN" />
+                                        <button type="button" onClick={() => removeSub(index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
+                                    </div>
+                                ))}
+                                <button type="button" onClick={addSub} className="text-sm text-sky-400 hover:underline">交代選手を追加</button>
+                            </div>
+                        </div>
+                    </div>
+                </FormSection>
+                <FormSection title="得点記録">{(match.goals || []).map((goal, index) => (<div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4 p-4 bg-gray-900 rounded-lg"><SelectField label={`得点者 ${index + 1}`} name="scorerId" value={goal.scorerId} onChange={(e) => handleGoalChange(index, 'scorerId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="得点者を選択" /><SelectField label={`アシスト ${index + 1}`} name="assistId" value={goal.assistId} onChange={(e) => handleGoalChange(index, 'assistId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="アシスト者を選択" /><button type="button" onClick={() => removeGoal(index)} className="mt-6 bg-red-800 text-white px-3 py-2 rounded-md hover:bg-red-700">削除</button></div>))}<button type="button" onClick={addGoal} className="bg-sky-800 text-sky-200 font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition duration-300">得点を追加</button></FormSection><FormSection title="警告・退場"><div className="grid md:grid-cols-2 gap-8"><div><h4 className="font-semibold text-gray-300 mb-2">警告</h4>{(match.cautions || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('cautions', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('cautions', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('cautions')} className="text-sm text-sky-400 hover:underline">警告を追加</button></div><div><h4 className="font-semibold text-gray-300 mb-2">退場</h4>{(match.ejections || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('ejections', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('ejections', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('ejections')} className="text-sm text-sky-400 hover:underline">退場を追加</button></div></div></FormSection><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={() => navigate('match-list')} className="bg-gray-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-500">保存</button></div></form>);
+            }
+            
+            // --- 変更のないコンポーネントやヘルパー関数 (変更がないため、元のコードをそのまま使用) ---
+            function Header({ navigate, isEditMode, onEditModeToggle, onLogout }) {
+                const emblemUrl = "https://i.imgur.com/h4W4M2S.jpeg";
+                const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+                const handleNavigate = (page) => {
+                    navigate(page);
+                    setIsMenuOpen(false);
+                };
+                
+                return (
+                    <header className="bg-gray-800 shadow-lg sticky top-0 z-40">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center h-20">
+                                <div className="flex items-center cursor-pointer" onClick={() => handleNavigate('dashboard')}>
+                                    {emblemUrl ? <img src={emblemUrl} alt="チームエンブレム" className="h-14 w-auto mr-2 md:mr-4"/> : <div className="h-14 w-14 mr-2 md:mr-4"></div>}
+                                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-wider">FURUGEN MINAMI FC</h1>
+                                </div>
+                                <nav className="hidden sm:flex items-center space-x-2">
+                                    <button onClick={() => handleNavigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
+                                    <button onClick={() => handleNavigate('rankings')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">ランキング</button>
+                                    <button onClick={() => handleNavigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
+                                    {isEditMode && <button onClick={() => handleNavigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
+                                    {isEditMode ? (
+                                        <button onClick={onLogout} className="flex items-center bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition-colors shadow-md"><IconUnlock className="mr-2"/>閲覧モード</button>
+                                    ) : (
+                                        <button onClick={onEditModeToggle} className="flex items-center bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors shadow-md"><IconLock className="mr-2"/>編集モード</button>
+                                    )}
+                                </nav>
+                                <div className="sm:hidden">
+                                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-300 hover:text-white focus:outline-none p-2">
+                                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {isMenuOpen && (
+                            <div className="sm:hidden">
+                                <nav className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                                    <button onClick={() => handleNavigate('dashboard')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">ダッシュボード</button>
+                                    <button onClick={() => handleNavigate('rankings')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">ランキング</button>
+                                    <button onClick={() => handleNavigate('match-list')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">試合一覧</button>
+                                    {isEditMode && <button onClick={() => handleNavigate('player-management')} className="text-gray-300 hover:bg-gray-700 hover:text-white block w-full text-left px-3 py-2 rounded-md font-medium transition-colors">選手管理</button>}
+                                    <div className="pt-2">
+                                        {isEditMode ? (
+                                            <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="flex items-center w-full text-left bg-red-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-red-600 transition-colors shadow-md"><IconUnlock className="mr-2"/>閲覧モード</button>
+                                        ) : (
+                                            <button onClick={() => { onEditModeToggle(); setIsMenuOpen(false); }} className="flex items-center w-full text-left bg-sky-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-sky-600 transition-colors shadow-md"><IconLock className="mr-2"/>編集モード</button>
+                                        )}
+                                    </div>
+                                </nav>
                             </div>
                         )}
-                    </div>
-                )}
-            </div></FormSection>
-            <FormSection title="出場選手">
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-400">出場選手カテゴリーで絞り込み</label>
-                    <div className="flex flex-wrap gap-4 mt-2">
-                        {categories.map(cat => (
-                            <label key={cat} className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedCategories.includes(cat)}
-                                    onChange={() => handleCategoryChange(cat)}
-                                    className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500"
-                                />
-                                <span>{cat}</span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-8">
-                    <div>
-                        <h4 className="font-semibold text-gray-300 mb-3">先発出場選手</h4>
-                        <div className="space-y-2">
-                            {(match.starters || []).map((starter, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <SelectField label="" name="position" value={starter.position} onChange={(e) => handleStarterChange(index, 'position', e.target.value)} options={positions} />
-                                    <SelectField label="" name="playerId" value={starter.playerId} onChange={(e) => handleStarterChange(index, 'playerId', e.target.value)} options={availableStarters(index).map(p => ({ value: p.id, label: `${p.number} ${p.name}`}))} defaultOption="選手を選択" />
-                                    <button type="button" onClick={() => removeStarter(index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
-                                </div>
-                            ))}
-                            {(match.format === 'その他') && <button type="button" onClick={addStarter} className="text-sm text-sky-400 hover:underline">先発選手を追加</button>}
+                    </header>
+                );
+            }
+            function PasswordModal({ onSubmit, onClose }) {
+                const [password, setPassword] = useState('');
+                const handleSubmit = (e) => { e.preventDefault(); onSubmit(password); };
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+                        <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-sm m-4">
+                            <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-white">編集モード</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div>
+                            <p className="text-gray-400 mb-4">編集するには合言葉を入力してください。</p>
+                            <form onSubmit={handleSubmit}>
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white rounded-md shadow-sm py-2 px-3 mb-4 focus:ring-sky-500 focus:border-sky-500" placeholder="合言葉" autoFocus />
+                                <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">決定</button>
+                            </form>
                         </div>
                     </div>
-                    <div>
-                        <h4 className="font-semibold text-gray-300 mb-3">途中出場選手</h4>
-                        <div className="space-y-2">
-                            {(match.subs || []).map((sub, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <SelectField label="" name="playerOut" value={sub.playerOut} onChange={(e) => handleSubChange(index, 'playerOut', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="OUT" />
-                                    <SelectField label="" name="playerIn" value={sub.playerIn} onChange={(e) => handleSubChange(index, 'playerIn', e.target.value)} options={filteredPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}`}))} defaultOption="IN" />
-                                    <button type="button" onClick={() => removeSub(index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
-                                </div>
-                            ))}
-                            <button type="button" onClick={addSub} className="text-sm text-sky-400 hover:underline">交代選手を追加</button>
+                );
+            }
+            function Dashboard({ navigate, matches, isEditMode }) {
+                const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
+                
+                const CategoryDashboard = ({ category }) => {
+                    const categoryMatches = useMemo(() => sortedMatches.filter(m => m.matchCategory === category), [sortedMatches, category]);
+                    const last10CategoryMatches = useMemo(() => categoryMatches.slice(0, 10), [categoryMatches]);
+                    
+                    const teamStats = useMemo(() => {
+                        let wins = 0, losses = 0, draws = 0, goalsFor = 0, goalsAgainst = 0;
+                        last10CategoryMatches.forEach(match => {
+                            if (match.result === '勝利') wins++;
+                            else if (match.result === '敗戦') losses++;
+                            else if (match.result === '引分') draws++;
+                            goalsFor += match.ownScore || 0;
+                            goalsAgainst += match.opponentScore || 0;
+                        });
+                        return { wins, losses, draws, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, last5Matches: last10CategoryMatches.slice(0, 5) };
+                    }, [last10CategoryMatches]);
+                    
+                    return (
+                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6 flex flex-col">
+                            <h3 className="text-3xl font-bold text-white text-center">{category}</h3>
+                            <div className="bg-gray-900 p-4 rounded-lg min-h-[160px]">
+                                <h4 className="text-lg font-semibold text-white mb-2 text-center">戦績 (直近10試合)</h4>
+                                {last10CategoryMatches.length > 0 ? (
+                                    <>
+                                        <div className="flex justify-around text-center">
+                                            <div><p className="text-2xl font-bold text-green-400">{teamStats.wins}</p><p className="text-xs text-gray-400">勝利</p></div>
+                                            <div><p className="text-2xl font-bold text-red-400">{teamStats.losses}</p><p className="text-xs text-gray-400">敗戦</p></div>
+                                            <div><p className="text-2xl font-bold text-yellow-400">{teamStats.draws}</p><p className="text-xs text-gray-400">引分</p></div>
+                                        </div>
+                                        <div className="flex justify-around text-center pt-3 mt-3 border-t border-gray-700">
+                                            <div><p className="text-2xl font-bold text-sky-400">{teamStats.goalsFor}</p><p className="text-xs text-gray-400">得点</p></div>
+                                            <div><p className="text-2xl font-bold text-orange-400">{teamStats.goalsAgainst}</p><p className="text-xs text-gray-400">失点</p></div>
+                                            <div><p className={`text-2xl font-bold ${teamStats.goalDifference >= 0 ? 'text-green-400' : 'text-red-400'}`}>{teamStats.goalDifference > 0 ? '+' : ''}{teamStats.goalDifference}</p><p className="text-xs text-gray-400">得失点差</p></div>
+                                        </div>
+                                    </>
+                                ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
+                            </div>
+                            <div className="bg-gray-900 p-4 rounded-lg min-h-[190px]">
+                                <h4 className="text-lg font-semibold mb-2 text-white text-center">最近の試合結果</h4>
+                                {teamStats.last5Matches.length > 0 ? (
+                                    <ul className="space-y-2">
+                                        {teamStats.last5Matches.map(match => (
+                                            <li key={match.id} className="flex justify-between items-center text-sm">
+                                                <span>vs {match.opponent}</span>
+                                                <span className="font-bold">{match.ownScore} - {match.opponentScore}
+                                                    <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${match.result === '勝利' ? 'bg-green-500 text-white' : match.result === '敗戦' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>
+                                                        {match.result}
+                                                    </span>
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
+                            </div>
                         </div>
-                    </div>
-                </div>
-            </FormSection>
-            <FormSection title="得点記録">{(match.goals || []).map((goal, index) => (<div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4 p-4 bg-gray-900 rounded-lg"><SelectField label={`得点者 ${index + 1}`} name="scorerId" value={goal.scorerId} onChange={(e) => handleGoalChange(index, 'scorerId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="得点者を選択" /><SelectField label={`アシスト ${index + 1}`} name="assistId" value={goal.assistId} onChange={(e) => handleGoalChange(index, 'assistId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="アシスト者を選択" /><button type="button" onClick={() => removeGoal(index)} className="mt-6 bg-red-800 text-white px-3 py-2 rounded-md hover:bg-red-700">削除</button></div>))}<button type="button" onClick={addGoal} className="bg-sky-800 text-sky-200 font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition duration-300">得点を追加</button></FormSection><FormSection title="警告・退場"><div className="grid md:grid-cols-2 gap-8"><div><h4 className="font-semibold text-gray-300 mb-2">警告</h4>{(match.cautions || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('cautions', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('cautions', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('cautions')} className="text-sm text-sky-400 hover:underline">警告を追加</button></div><div><h4 className="font-semibold text-gray-300 mb-2">退場</h4>{(match.ejections || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('ejections', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('ejections', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('ejections')} className="text-sm text-sky-400 hover:underline">退場を追加</button></div></div></FormSection><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={() => navigate('match-list')} className="bg-gray-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-500">保存</button></div></form>);
-        }
-        
-        const FormSection = ({ title, children }) => (<div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700"><h3 className="text-xl font-semibold mb-6 border-b border-gray-700 pb-3 text-white">{title}</h3>{children}</div>);
-        const InputField = ({ label, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><input {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" /></div>);
-        const SelectField = ({ label, name, value, onChange, options, defaultOption, ...props }) => (<div>{label && <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>}<select name={name} value={value} onChange={onChange} {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">{defaultOption && <option value="">{defaultOption}</option>}{options.map((opt, index) => (typeof opt === 'object' ? <option key={opt.value || index} value={opt.value}>{opt.label}</option> : <option key={opt} value={opt}>{opt}</option>))}</select></div>);
-        
-        function EditStatsModal({ player, onSave, onClose }) {
-            const [stats, setStats] = useState(player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 });
-            const handleChange = (e) => setStats(prev => ({ ...prev, [e.target.name]: parseInt(e.target.value, 10) || 0 }));
-            const handleSubmit = (e) => { e.preventDefault(); onSave(player.id, stats); };
-            const fields = [{ label: '出場試合数', name: 'matchesPlayed' }, { label: '得点', name: 'goals' }, { label: 'アシスト', name: 'assists' }, { label: '警告', name: 'cautions' }, { label: '退場', name: 'ejections' }];
-            return (<div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50"><div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-md m-4"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-white">{player.name} の基礎記録を編集</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div><p className="text-sm text-gray-400 mb-6">ここでの入力は、アプリで記録された成績に加算される基礎値となります。</p><form onSubmit={handleSubmit}><div className="grid grid-cols-2 gap-4">{fields.map(f => (<div key={f.name}><label className="block text-sm font-medium text-gray-400">{f.label}</label><input type="number" name={f.name} value={stats[f.name]} onChange={handleChange} className="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3" /></div>))}</div><div className="mt-8 flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">保存</button></div></form></div></div>);
-        }
+                    );
+                };
 
-        ReactDOM.render(<App />, document.getElementById('root'));
-      }
+                return (
+                    <div className="space-y-8">
+                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg text-center border border-gray-700">
+                            <h2 className="text-3xl font-bold text-white mb-4">TEAM DASHBOARD</h2>
+                            <p className="text-gray-400 mb-6">試合結果や選手の成績を記録・管理しましょう。</p>
+                            <div className="flex flex-col sm:flex-row justify-center gap-4">
+                                {isEditMode && <button onClick={() => navigate('add-match')} className="bg-red-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-600 transition-colors shadow-md flex items-center justify-center"><IconPlus /> <span className="ml-2">新しい試合を記録</span></button>}
+                                <button onClick={() => navigate('player-stats')} className="bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-colors shadow-md">選手成績一覧を見る</button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <CategoryDashboard category="U12" />
+                            <CategoryDashboard category="U11" />
+                            <CategoryDashboard category="U10" />
+                        </div>
+                    </div>
+                );
+            }
+            function RankingsPage({ playerStats, matches, players }) {
+                const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
+                
+                const totalGoalRanking = [...playerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
+                const totalAssistRanking = [...playerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
+
+                const CategoryRankings = ({ category }) => {
+                    const categoryPlayers = useMemo(() => {
+                        const categoryAge = parseInt(category.replace('U', ''));
+                        if (category === 'U10') {
+                            return players.filter(p => {
+                                if (!p.category) return false;
+                                const playerAge = parseInt(p.category.replace('U', ''));
+                                return playerAge <= categoryAge;
+                            });
+                        } else {
+                            return players.filter(p => p.category === category);
+                        }
+                    }, [players, category]);
+                    
+                    const categoryPlayerStats = useMemo(() => {
+                        const stats = {};
+                        categoryPlayers.forEach(p => { 
+                            const totalPlayerStat = playerStats.find(ps => ps.id === p.id);
+                            stats[p.id] = { 
+                                ...p,
+                                recentGoals: 0, 
+                                recentAssists: 0,
+                                totalGoals: totalPlayerStat ? totalPlayerStat.totalGoals : 0,
+                                totalAssists: totalPlayerStat ? totalPlayerStat.totalAssists : 0,
+                            }; 
+                        });
+
+                        const last10OverallMatches = sortedMatches.slice(0, 10);
+
+                        last10OverallMatches.forEach(m => {
+                            (m.goals || []).forEach(g => {
+                                if (stats[g.scorerId]) {
+                                    stats[g.scorerId].recentGoals++;
+                                }
+                                if (stats[g.assistId]) {
+                                    stats[g.assistId].recentAssists++;
+                                }
+                            });
+                        });
+                        return Object.values(stats);
+                    }, [categoryPlayers, sortedMatches, playerStats]);
+
+                    const recentGoalRanking = [...categoryPlayerStats].filter(p => p.recentGoals > 0).sort((a, b) => b.recentGoals - a.recentGoals).slice(0, 5);
+                    const recentAssistRanking = [...categoryPlayerStats].filter(p => p.recentAssists > 0).sort((a, b) => b.recentAssists - a.recentAssists).slice(0, 5);
+                    const categoryTotalGoalRanking = [...categoryPlayerStats].filter(p => p.totalGoals > 0).sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 5);
+                    const categoryTotalAssistRanking = [...categoryPlayerStats].filter(p => p.totalAssists > 0).sort((a, b) => b.totalAssists - a.totalAssists).slice(0, 5);
+
+                    return (
+                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6 flex flex-col">
+                            <h3 className="text-3xl font-bold text-white text-center">{category}</h3>
+                            <RankingCard title="得点 (直近10試合)" ranking={recentGoalRanking} dataKey="recentGoals" unit="点" color="text-red-400" />
+                            <RankingCard title="アシスト (直近10試合)" ranking={recentAssistRanking} dataKey="recentAssists" unit="回" color="text-sky-400" />
+                            <RankingCard title="通算 得点" ranking={categoryTotalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
+                            <RankingCard title="通算 アシスト" ranking={categoryTotalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
+                        </div>
+                    );
+                };
+
+                return (
+                    <div className="space-y-8">
+                        <h2 className="text-3xl font-bold text-white mb-4 text-center">ランキング</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <CategoryRankings category="U12" />
+                            <CategoryRankings category="U11" />
+                            <CategoryRankings category="U10" />
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-8 pt-8 border-t-2 border-gray-700">
+                            <RankingCard title="全体の通算 得点ランキング" ranking={totalGoalRanking} dataKey="totalGoals" unit="点" color="text-red-400" />
+                            <RankingCard title="全体の通算 アシストランキング" ranking={totalAssistRanking} dataKey="totalAssists" unit="回" color="text-sky-400" />
+                        </div>
+                    </div>
+                )
+            }
+            function RankingCard({ title, ranking, dataKey, unit, color }) {
+                const rankColors = ['text-yellow-400', 'text-gray-300', 'text-yellow-600'];
+                let lastScore = -1;
+                let currentRank = 0;
+                return (
+                    <div className="bg-gray-900 p-4 rounded-lg min-h-[250px]">
+                        <h3 className="text-lg font-semibold mb-3 text-white text-center">{title}</h3>
+                        {ranking.length > 0 ? (
+                            <ol className="space-y-2">
+                                {ranking.map((player, index) => {
+                                    if (player[dataKey] !== lastScore) {
+                                        currentRank = index + 1;
+                                        lastScore = player[dataKey];
+                                    }
+                                    return (
+                                        <li key={player.id || player.name} className="flex items-center justify-between p-2 bg-gray-800 rounded-md text-sm">
+                                            <div className="flex items-center">
+                                                <span className={`font-bold w-7 ${rankColors[currentRank - 1] || 'text-gray-500'}`}>
+                                                    {currentRank}.
+                                                </span>
+                                                <span className="font-medium">{player.name}</span>
+                                            </div>
+                                            <span className={`font-bold ${color}`}>{player[dataKey]} {unit}</span>
+                                        </li>
+                                    );
+                                })}
+                            </ol>
+                        ) : (<p className="text-gray-500 text-center text-sm pt-4">記録がありません</p>)}
+                    </div>
+                );
+            }
+            function EditStatsModal({ player, onSave, onClose }) {
+                const [stats, setStats] = useState(player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 });
+                const handleChange = (e) => setStats(prev => ({ ...prev, [e.target.name]: parseInt(e.target.value, 10) || 0 }));
+                const handleSubmit = (e) => { e.preventDefault(); onSave(player.id, stats); };
+                const fields = [{ label: '出場試合数', name: 'matchesPlayed' }, { label: '得点', name: 'goals' }, { label: 'アシスト', name: 'assists' }, { label: '警告', name: 'cautions' }, { label: '退場', name: 'ejections' }];
+                return (<div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50"><div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-md m-4"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-white">{player.name} の基礎記録を編集</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div><p className="text-sm text-gray-400 mb-6">ここでの入力は、アプリで記録された成績に加算される基礎値となります。</p><form onSubmit={handleSubmit}><div className="grid grid-cols-2 gap-4">{fields.map(f => (<div key={f.name}><label className="block text-sm font-medium text-gray-400">{f.label}</label><input type="number" name={f.name} value={stats[f.name]} onChange={handleChange} className="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3" /></div>))}</div><div className="mt-8 flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">保存</button></div></form></div></div>);
+            }
+            const FormSection = ({ title, children }) => (<div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700"><h3 className="text-xl font-semibold mb-6 border-b border-gray-700 pb-3 text-white">{title}</h3>{children}</div>);
+            const InputField = ({ label, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><input {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" /></div>);
+            const SelectField = ({ label, name, value, onChange, options, defaultOption, ...props }) => (<div>{label && <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>}<select name={name} value={value} onChange={onChange} {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">{defaultOption && <option value="">{defaultOption}</option>}{options.map((opt, index) => (typeof opt === 'object' ? <option key={opt.value || index} value={opt.value}>{opt.label}</option> : <option key={opt} value={opt}>{opt}</option>))}</select></div>);
+
+            ReactDOM.render(<App />, document.getElementById('root'));
+        }
     </script>
 </body>
 </html>
-
-
