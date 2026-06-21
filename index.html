@@ -59,10 +59,10 @@
         const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
         const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
         const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>;
-        const IconChevronDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>;
+        const IconChevronDown = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>;
         const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
-        const IconLock = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
-        const IconUnlock = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>;
+        const IconLock = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
+        const IconUnlock = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>;
 
         // --- メインアプリケーションコンポーネント ---
         function App() {
@@ -111,13 +111,11 @@
             };
             
             const handlePasswordSubmit = (password) => {
-                // `alert()`は環境によってブロックされる可能性があるため、UIでのフィードバックが望ましいです
                 if (password === 'soccer') { 
                     setIsEditMode(true); 
                     setShowPasswordModal(false); 
                 } else { 
-                    console.error('合言葉が違います。');
-                    // ここでモーダル内にエラーメッセージを表示する実装を追加できます
+                    alert('合言葉が違います。');
                 }
             };
 
@@ -159,7 +157,7 @@
                     case 'player-management': return <PlayerManagement players={players} />;
                     case 'add-match': return <MatchForm navigate={navigate} players={players} />;
                     case 'edit-match': return <MatchForm navigate={navigate} players={players} existingMatch={editingMatch} />;
-                    case 'player-stats': return <PlayerStatsList playerStats={playerStats} isEditMode={isEditMode} />;
+                    case 'player-stats': return <PlayerStatsList playerStats={playerStats} />;
                     default: return <Dashboard navigate={navigate} matches={matches} isEditMode={isEditMode}/>;
                 }
             };
@@ -473,465 +471,460 @@
                 setNumber(player.number); 
                 setCategory(player.category || 'U12');
             };
+
             const handleDelete = async (id) => {
-                try { await db.collection(`artifacts/${appId}/public/data/players`).doc(id).delete(); } 
-                catch (error) { console.error("Error deleting player: ", error); }
+                if (window.confirm("本当にこの選手を削除しますか？")) {
+                    const playersCollectionPath = `artifacts/${appId}/public/data/players`;
+                    await db.collection(playersCollectionPath).doc(id).delete();
+                }
             };
-            
-            const sortedPlayers = [...players].sort((a,b) => a.number - b.number);
 
             return (
-                <div className="max-w-5xl mx-auto">
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 mb-8">
-                        <h2 className="text-2xl font-semibold mb-4">{editingPlayer ? '選手情報を編集' : '新しい選手を追加'}</h2>
-                        <form onSubmit={handleSubmit} className="grid sm:grid-cols-4 gap-4 items-end">
-                            <div><label htmlFor="playerCategory" className="block text-sm font-medium text-gray-400">カテゴリー</label>
-                                <select id="playerCategory" value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">
-                                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                </select>
-                            </div>
-                            <div><label htmlFor="playerName" className="block text-sm font-medium text-gray-400">選手名</label><input type="text" id="playerName" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：山田 太郎" /></div>
-                            <div><label htmlFor="playerNumber" className="block text-sm font-medium text-gray-400">背番号</label><input type="number" id="playerNumber" value={number} onChange={(e) => setNumber(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" placeholder="例：10" /></div>
-                            <div className="flex space-x-2">
-                                    <button type="submit" className="w-full bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">{editingPlayer ? '更新' : '追加'}</button>
-                                    {editingPlayer && <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); setCategory('U12'); }} className="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button>}
-                            </div>
-                        </form>
+                <div className="space-y-6">
+                    <h2 className="text-3xl font-bold text-center">選手管理</h2>
+                    <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg border border-gray-700 max-w-md mx-auto space-y-4">
+                        <h3 className="text-xl font-bold">{editingPlayer ? '選手情報の編集' : '新規選手登録'}</h3>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300">背番号</label>
+                            <input type="number" value={number} onChange={(e) => setNumber(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300">名前</label>
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300">カテゴリー</label>
+                            <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white">
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div className="flex gap-2">
+                            <button type="submit" className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-md">{editingPlayer ? '更新' : '登録'}</button>
+                            {editingPlayer && (
+                                <button type="button" onClick={() => { setEditingPlayer(null); setName(''); setNumber(''); }} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md">キャンセル</button>
+                            )}
+                        </div>
+                    </form>
+
+                    <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 max-w-4xl mx-auto overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-gray-700 text-gray-400">
+                                    <th className="py-2 px-4">背番号</th>
+                                    <th className="py-2 px-4">名前</th>
+                                    <th className="py-2 px-4">カテゴリー</th>
+                                    <th className="py-2 px-4 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[...players].sort((a,b) => a.number - b.number).map(player => (
+                                    <tr key={player.id} className="border-b border-gray-700 hover:bg-gray-750">
+                                        <td className="py-2 px-4 font-mono">#{player.number}</td>
+                                        <td className="py-2 px-4 font-bold">{player.name}</td>
+                                        <td className="py-2 px-4">{player.category}</td>
+                                        <td className="py-2 px-4 text-right space-x-2">
+                                            <button onClick={() => handleEdit(player)} className="text-sky-400 hover:text-sky-300"><IconEdit /></button>
+                                            <button onClick={() => handleDelete(player.id)} className="text-red-400 hover:text-red-300"><IconTrash /></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-                    <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700"><h2 className="text-2xl font-semibold p-6">選手一覧</h2><div className="overflow-x-auto"><table className="w-full text-left">
-                        <thead className="bg-gray-900"><tr>
-                            <th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">カテゴリー</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">背番号</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">選手名</th><th className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase">操作</th>
-                        </tr></thead>
-                        <tbody className="divide-y divide-gray-700">{sortedPlayers.map(player => (
-                            <tr key={player.id} className="hover:bg-gray-700">
-                                <td className="px-6 py-4">{player.category}</td><td className="px-6 py-4 font-medium">{player.number}</td><td className="px-6 py-4">{player.name}</td>
-                                <td className="px-6 py-4 flex space-x-2">
-                                    <button onClick={() => handleEdit(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
-                                    <button onClick={() => handleDelete(player.id)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
-                                </td>
-                            </tr>
-                        ))}</tbody>
-                    </table></div></div>
                 </div>
             );
         }
 
         function MatchList({ navigate, matches, players, isEditMode }) {
-            const [categoryFilter, setCategoryFilter] = useState('All');
-            const categories = ['All', 'U12', 'U11', 'U10'];
-
-            const getPlayerName = (id) => players.find(p => p.id === id)?.name || '不明';
-            
+            const [selectedMatchId, setSelectedMatchId] = useState(null);
             const sortedMatches = useMemo(() => [...matches].sort((a, b) => new Date(b.date) - new Date(a.date)), [matches]);
-            
-            const filteredMatches = useMemo(() => {
-                if(categoryFilter === 'All') return sortedMatches;
-                return sortedMatches.filter(match => match.matchCategory === categoryFilter);
-            }, [sortedMatches, categoryFilter]);
 
             const handleDelete = async (id) => {
-                try { await db.collection(`artifacts/${appId}/public/data/matches`).doc(id).delete(); } 
-                catch (error) { console.error("Error deleting match: ", error); }
+                if (window.confirm('本当にこの試合記録を削除しますか？')) {
+                    const matchesCollectionPath = `artifacts/${appId}/public/data/matches`;
+                    await db.collection(matchesCollectionPath).doc(id).delete();
+                }
             };
 
-            const getFormation = (starters) => {
-                if (!starters || starters.length === 0) return '';
-                const df = starters.filter(s => s.position === 'DF').length;
-                const mf = starters.filter(s => s.position === 'MF').length;
-                const fw = starters.filter(s => s.position === 'FW').length;
-                return `(${df}-${mf}-${fw})`;
+            const getPlayerName = (id) => {
+                const p = players.find(pl => pl.id === id);
+                return p ? p.name : '不明な選手';
             };
 
             return (
-                <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
-                    <div className="p-6">
-                        <h2 className="text-2xl font-semibold text-white">試合一覧</h2>
-                        <div className="mt-4 border-b border-gray-700">
-                            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                                {categories.map(cat => (
-                                    <button
-                                        key={cat}
-                                        onClick={() => setCategoryFilter(cat)}
-                                        className={`${
-                                            categoryFilter === cat
-                                                ? 'border-sky-500 text-sky-400'
-                                                : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-                                    >
-                                        {cat}
-                                    </button>
-                                ))}
-                            </nav>
+                <div className="space-y-6 max-w-4xl mx-auto">
+                    <h2 className="text-3xl font-bold text-center">試合一覧</h2>
+                    {sortedMatches.length === 0 ? (
+                        <p className="text-center text-gray-500">試合記録がありません。</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {sortedMatches.map(match => {
+                                const isExpanded = selectedMatchId === match.id;
+                                return (
+                                    <div key={match.id} className="bg-gray-800 border border-gray-700 rounded-lg shadow-md overflow-hidden">
+                                        <div 
+                                            className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer hover:bg-gray-750"
+                                            onClick={() => setSelectedMatchId(isExpanded ? null : match.id)}
+                                        >
+                                            <div>
+                                                <span className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-md mr-2">{match.matchCategory}</span>
+                                                <span className="text-sm text-gray-400">{match.date}</span>
+                                                <h3 className="text-xl font-bold mt-1">vs {match.opponent}</h3>
+                                            </div>
+                                            <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                                                <div className="text-right">
+                                                    <span className="text-2xl font-black mr-2">{match.ownScore} - {match.opponentScore}</span>
+                                                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${match.result === '勝利' ? 'bg-green-500' : match.result === '敗戦' ? 'bg-red-500' : 'bg-yellow-500'}`}>{match.result}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                    {isEditMode && (
+                                                        <>
+                                                            <button onClick={() => navigate('edit-match', match)} className="p-2 text-sky-400 hover:bg-gray-700 rounded-md"><IconEdit /></button>
+                                                            <button onClick={() => handleDelete(match.id)} className="p-2 text-red-400 hover:bg-gray-700 rounded-md"><IconTrash /></button>
+                                                        </>
+                                                    )}
+                                                    <span className={`text-gray-400 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}><IconChevronDown /></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {isExpanded && (
+                                            <div className="p-4 bg-gray-900 border-t border-gray-700 space-y-4 text-sm">
+                                                <div>
+                                                    <h4 className="font-bold text-gray-400 mb-1">スターティングメンバー</h4>
+                                                    <p className="text-gray-200">{(match.starters || []).map(s => getPlayerName(s.playerId)).join(', ') || '未登録'}</p>
+                                                </div>
+                                                {match.subs && match.subs.length > 0 && (
+                                                    <div>
+                                                        <h4 className="font-bold text-gray-400 mb-1">交代選手</h4>
+                                                        <ul className="list-disc list-inside text-gray-200">
+                                                            {match.subs.map((s, idx) => (
+                                                                <li key={idx}>OUT: {getPlayerName(s.playerOut)} ➔ IN: {getPlayerName(s.playerIn)}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <h4 className="font-bold text-gray-400 mb-1">得点経過</h4>
+                                                    {(match.goals || []).length === 0 ? <p className="text-gray-500">得点記録なし</p> : (
+                                                        <ul className="list-decimal list-inside text-gray-200 space-y-1">
+                                                            {match.goals.map((g, idx) => (
+                                                                <li key={idx}>
+                                                                    得点: <span className="font-bold text-green-400">{getPlayerName(g.scorerId)}</span> 
+                                                                    {g.assistId ? <span> (アシスト: <span className="text-sky-400">{getPlayerName(g.assistId)}</span>)</span> : ' (アシストなし)'}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                                {((match.cautions && match.cautions.length > 0) || (match.ejections && match.ejections.length > 0)) && (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-800">
+                                                        {match.cautions && match.cautions.length > 0 && (
+                                                            <div>
+                                                                <h4 className="font-bold text-yellow-500 mb-1">警告 (イエロー)</h4>
+                                                                <p className="text-gray-200">{match.cautions.map(c => getPlayerName(c.playerId)).join(', ')}</p>
+                                                            </div>
+                                                        )}
+                                                        {match.ejections && match.ejections.length > 0 && (
+                                                            <div>
+                                                                <h4 className="font-bold text-red-500 mb-1">退場 (レッド)</h4>
+                                                                <p className="text-gray-200">{match.ejections.map(e => getPlayerName(e.playerId)).join(', ')}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
-                    </div>
-                    <div className="space-y-4 p-6 pt-0">
-                        {filteredMatches.map(match => (
-                            <details key={match.id} className="bg-gray-900 p-4 rounded-lg border border-gray-700">
-                                <summary className="font-semibold cursor-pointer flex justify-between items-center">
-                                    <div className="flex-grow">
-                                        <span className="text-sky-400">{match.date}</span> {match.matchCategory && match.matchCategory !== 'All' && `[${match.matchCategory}] `}{match.tournamentName && `[${match.tournamentName}]`} vs {match.opponent} 
-                                        <span className="ml-4 text-lg font-bold">{match.ownScore} - {match.opponentScore}</span> 
-                                        <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${match.result === '勝利' ? 'bg-green-500 text-white' : match.result === '敗戦' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>
-                                            {match.result}
-                                            {match.pkExists && ` (PK ${match.pkResult === 'PK勝' ? '勝ち' : '負け'})`}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center space-x-2 flex-shrink-0">
-                                        {isEditMode && <>
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('edit-match', match); }} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleDelete(match.id); }} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
-                                        </>}
-                                        <IconChevronDown />
-                                    </div>
-                                </summary>
-                                <div className="mt-4 pt-4 border-t border-gray-700 grid md:grid-cols-2 gap-4 text-sm text-gray-300">
-                                    <div>
-                                        <p><strong>試合形式:</strong> {match.matchType}</p>
-                                        <p><strong>会場:</strong> {match.venue}</p>
-                                        <p><strong>レギュレーション:</strong> {match.regulation} ({match.regulationTime}分)</p>
-                                    </div>
-                                    <div><p><strong>形式:</strong> {match.format}</p><p><strong>天気:</strong> {match.weather}</p></div>
-                                    {match.pkExists && <div className="md:col-span-2"><p><strong>PK戦:</strong> {match.ownPkScore} - {match.opponentPkScore}</p></div>}
-                                    <div className="md:col-span-2"><p><strong>得点者:</strong> {(match.goals || []).map(g => `${getPlayerName(g.scorerId)}${g.assistId ? ` (${getPlayerName(g.assistId)})` : ''}`).join(', ') || 'なし'}</p></div>
-                                    <div className="md:col-span-2">
-                                        <h4 className="font-bold mt-2">スターティングメンバー <span className="text-gray-400 font-normal">(フォーメーション {getFormation(match.starters)})</span></h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1">
-                                            {(match.starters || []).map(s => <p key={s.playerId}>{s.position}: {getPlayerName(s.playerId)}</p>)}
-                                        </div>
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <h4 className="font-bold mt-2">交代選手</h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1">
-                                            {(match.subs || []).map((s, i) => <p key={i}>{getPlayerName(s.playerOut)} → {getPlayerName(s.playerIn)}</p>)}
-                                        </div>
-                                    </div>
-                                </div>
-                            </details>
-                        ))}
-                    </div>
+                    )}
                 </div>
             );
         }
 
-        function PlayerStatsList({ playerStats, isEditMode }) {
-            const [sortConfig, setSortConfig] = useState({ key: 'category', direction: 'descending' });
-            const [editingPlayer, setEditingPlayer] = useState(null);
-            
-            const sortedPlayerStats = useMemo(() => {
-                let sortableItems = [...playerStats];
-                if (sortConfig.key) {
-                    sortableItems.sort(function(a, b) {
-                        let valA, valB;
+        function MatchForm({ navigate, players, existingMatch = null }) {
+            const [date, setDate] = useState(existingMatch ? existingMatch.date : new Date().toISOString().split('T')[0]);
+            const [matchCategory, setMatchCategory] = useState(existingMatch ? existingMatch.matchCategory : 'U12');
+            const [opponent, setOpponent] = useState(existingMatch ? existingMatch.opponent : '');
+            const [ownScore, setOwnScore] = useState(existingMatch ? existingMatch.ownScore : 0);
+            const [opponentScore, setOpponentScore] = useState(existingMatch ? existingMatch.opponentScore : 0);
+            const [result, setResult] = useState(existingMatch ? existingMatch.result : '勝利');
 
-                        if (sortConfig.key === 'category') {
-                            valA = a.category ? parseInt(a.category.replace('U', '')) : 0;
-                            valB = b.category ? parseInt(b.category.replace('U', '')) : 0;
-                        } else {
-                            valA = a[sortConfig.key] || 0;
-                            valB = b[sortConfig.key] || 0;
-                        }
+            const [starters, setStarters] = useState(existingMatch ? existingMatch.starters || [] : []);
+            const [subs, setSubs] = useState(existingMatch ? existingMatch.subs || [] : []);
+            const [goals, setGoals] = useState(existingMatch ? existingMatch.goals || [] : []);
+            const [cautions, setCautions] = useState(existingMatch ? existingMatch.cautions || [] : []);
+            const [ejections, setEjections] = useState(existingMatch ? existingMatch.ejections || [] : []);
 
-                        if (valA < valB) {
-                            return sortConfig.direction === 'ascending' ? -1 : 1;
-                        }
-                        if (valA > valB) {
-                            return sortConfig.direction === 'ascending' ? 1 : -1;
-                        }
-                        return 0;
-                    });
-                }
-                return sortableItems;
-            }, [playerStats, sortConfig]);
+            const [currentScorer, setCurrentScorer] = useState('');
+            const [currentAssist, setCurrentAssist] = useState('');
+            const [subOut, setSubOut] = useState('');
+            const [subIn, setSubIn] = useState('');
+            const [cautionPlayer, setCautionPlayer] = useState('');
+            const [ejectionPlayer, setEjectionPlayer] = useState('');
 
-            const requestSort = (key) => {
-                let direction = 'ascending';
-                if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-                    direction = 'descending';
-                }
-                setSortConfig({ key, direction });
-            };
-            const handleUpdateStats = async (playerId, newBaseStats) => {
-                try {
-                    await db.collection(`artifacts/${appId}/public/data/players`).doc(playerId).update({ baseStats: newBaseStats });
-                    setEditingPlayer(null);
-                } catch (error) { console.error("Error updating stats: ", error); }
-            };
-            const columns = [
-                { label: 'カテゴリー', key: 'category' }, { label: '番号', key: 'number' }, { label: '選手名', key: 'name' }, { label: '出場試合', key: 'totalMatchesPlayed' },
-                { label: '得点', key: 'totalGoals' }, { label: 'アシスト', key: 'totalAssists' },
-                { label: '警告', key: 'totalCautions' }, { label: '退場', key: 'totalEjections' }
-            ];
-            if (isEditMode) columns.push({ label: '操作', key: 'actions' });
-
-            return (
-                <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
-                    <h2 className="text-2xl font-semibold p-6">選手成績一覧</h2>
-                    <div className="overflow-y-auto max-h-[calc(100vh-16rem)]">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-900 sticky top-0">
-                                <tr>{columns.map(col => (
-                                    <th key={col.key} className="px-6 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wider cursor-pointer" onClick={() => col.key !== 'actions' && requestSort(col.key)}>
-                                        {col.label} {sortConfig.key === col.key && (sortConfig.direction === 'ascending' ? ' ▲' : ' ▼')}
-                                    </th>
-                                ))}</tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-700">{sortedPlayerStats.map(player => (
-                                <tr key={player.id} className="hover:bg-gray-700">
-                                    {columns.map(col => <td key={col.key} className={`px-6 py-4 ${col.key === 'name' ? 'font-bold' : ''}`}>
-                                        {col.key === 'actions' ? 
-                                            <button onClick={() => setEditingPlayer(player)} className="p-1 text-sky-400 hover:text-sky-300"><IconEdit /></button> :
-                                            player[col.key]
-                                        }
-                                    </td>)}
-                                </tr>
-                            ))}</tbody>
-                        </table>
-                    </div>
-                    {editingPlayer && <EditStatsModal player={editingPlayer} onSave={handleUpdateStats} onClose={() => setEditingPlayer(null)} />}
-                </div>
-            );
-        }
-        
-        function MatchForm({ navigate, players, existingMatch }) {
-            const initialMatchState = { date: '', matchType: 'TRM', opponent: '', venue: '', format: '', weather: '晴れ', result: '勝利', ownScore: 0, opponentScore: 0, starters: [], subs: [], goals: [], cautions: [], ejections: [], tournamentName: '', pkExists: false, ownPkScore: 0, opponentPkScore: 0, pkResult: 'PK勝', matchCategory: 'U12', regulation: '前後半', regulationTime: 20 };
-            const [match, setMatch] = useState(initialMatchState);
-            const [selectedCategories, setSelectedCategories] = useState(['All']);
-            const categories = ['All', 'U12', 'U11', 'U10'];
-            const positions = ['GK', 'DF', 'MF', 'FW', 'FP'];
+            const categories = ['U12', 'U11', 'U10', 'U9', 'U8', 'U7'];
 
             useEffect(() => {
-                const starterLimits = { '8人制': 8, '11人制': 11, 'フットサル': 5 };
-                const requiredStarters = starterLimits[match.format];
-                
-                let currentStarters = match.starters || [];
-                if (requiredStarters && currentStarters.length !== requiredStarters) {
-                    const newStarters = Array(requiredStarters).fill(null).map((_, i) =>
-                        currentStarters[i] || { position: 'FP', playerId: '' }
-                    );
-                    setMatch(prev => ({...prev, starters: newStarters.slice(0, requiredStarters)}));
-                } else if (!requiredStarters) {
-                    setMatch(prev => ({...prev, starters: []}));
-                }
-            }, [match.format]);
+                if (ownScore > opponentScore) setResult('勝利');
+                else if (ownScore < opponentScore) setResult('敗戦');
+                else setResult('引分');
+            }, [ownScore, opponentScore]);
 
-            useEffect(() => {
-                if (existingMatch) {
-                    setMatch(prev => ({ ...initialMatchState, ...existingMatch }));
-                    if(existingMatch.matchCategories) {
-                        setSelectedCategories(existingMatch.matchCategories);
-                    }
+            const toggleStarter = (playerId) => {
+                if (starters.some(s => s.playerId === playerId)) {
+                    setStarters(starters.filter(s => s.playerId !== playerId));
                 } else {
-                    setMatch(initialMatchState);
-                    setSelectedCategories(['All']);
+                    setStarters([...starters, { playerId }]);
                 }
-            }, [existingMatch]);
-            
-            const handleCategoryChange = (category) => {
-                setSelectedCategories(prev => {
-                    if (category === 'All') {
-                        return prev.includes('All') ? [] : ['All'];
-                    }
-                    let newSelection = prev.filter(c => c !== 'All');
-                    if (newSelection.includes(category)) {
-                        newSelection = newSelection.filter(c => c !== category);
-                    } else {
-                        newSelection.push(category);
-                    }
-                    if (newSelection.length === 0) {
-                        return ['All'];
-                    }
-                    return newSelection;
-                });
             };
 
-            const filteredPlayers = useMemo(() => {
-                let playersToShow = [];
-                if (selectedCategories.includes('All')) {
-                    playersToShow = players;
-                } else {
-                    const playersSet = new Set();
-                    selectedCategories.forEach(cat => {
-                        if (cat === 'U10') {
-                            players.forEach(p => {
-                                if (!p.category) return;
-                                const playerAge = parseInt(p.category.replace('U', ''));
-                                if (playerAge <= 10) {
-                                    playersSet.add(p);
-                                }
-                            });
-                        } else {
-                            players.forEach(p => {
-                                if (p.category === cat) {
-                                    playersSet.add(p);
-                                }
-                            });
-                        }
-                    });
-                    playersToShow = Array.from(playersSet);
-                }
-                return playersToShow.sort((a, b) => a.number - b.number);
-            }, [players, selectedCategories]);
-
-            const handleChange = (e) => { 
-                const { name, value, type, checked } = e.target;
-                setMatch(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value })); 
+            const addGoal = () => {
+                if (!currentScorer) return;
+                setGoals([...goals, { scorerId: currentScorer, assistId: currentAssist || null }]);
+                setCurrentScorer('');
+                setCurrentAssist('');
+                setOwnScore(prev => prev + 1);
             };
 
-            const handleStarterChange = (index, field, value) => {
-                setMatch(prev => {
-                    const newStarters = [...prev.starters];
-                    newStarters[index][field] = value;
-                    return { ...prev, starters: newStarters };
-                });
+            const removeGoal = (index) => {
+                setGoals(goals.filter((_, i) => i !== index));
+                setOwnScore(prev => Math.max(0, prev - 1));
             };
-            const addStarter = () => setMatch(prev => ({ ...prev, starters: [...(prev.starters || []), { position: 'FP', playerId: '' }] }));
-            const removeStarter = (index) => setMatch(prev => ({ ...prev, starters: prev.starters.filter((_, i) => i !== index) }));
 
-            const handleSubChange = (index, field, value) => {
-                setMatch(prev => {
-                    const newSubs = [...prev.subs];
-                    newSubs[index][field] = value;
-                    return { ...prev, subs: newSubs };
-                });
+            const addSub = () => {
+                if (!subOut || !subIn) return;
+                setSubs([...subs, { playerOut: subOut, playerIn: subIn }]);
+                setSubOut(''); setSubIn('');
             };
-            const addSub = () => setMatch(prev => ({ ...prev, subs: [...(prev.subs || []), { playerOut: '', playerIn: '' }] }));
-            const removeSub = (index) => setMatch(prev => ({ ...prev, subs: prev.subs.filter((_, i) => i !== index) }));
-            
-            const addGoal = () => setMatch(prev => ({ ...prev, goals: [...(prev.goals || []), { scorerId: '', assistId: '' }] }));
-            const handleGoalChange = (index, field, value) => setMatch(prev => { const newGoals = [...prev.goals]; newGoals[index][field] = value; return { ...prev, goals: newGoals }; });
-            const removeGoal = (index) => setMatch(prev => ({ ...prev, goals: prev.goals.filter((_, i) => i !== index) }));
-            const addCard = (type) => setMatch(prev => ({ ...prev, [type]: [...(prev[type] || []), { playerId: '' }] }));
-            const handleCardChange = (type, index, value) => setMatch(prev => { const newCards = [...prev[type]]; newCards[index].playerId = value; return { ...prev, [type]: newCards }; });
-            const removeCard = (type, index) => setMatch(prev => ({ ...prev, [type]: prev[type].filter((_, i) => i !== index) }));
-            
+
+            const addCaution = () => {
+                if (!cautionPlayer) return;
+                setCautions([...cautions, { playerId: cautionPlayer }]);
+                setCautionPlayer('');
+            };
+
+            const addEjection = () => {
+                if (!ejectionPlayer) return;
+                setEjections([...ejections, { playerId: ejectionPlayer }]);
+                setEjectionPlayer('');
+            };
+
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                
-                const starterPlayerIds = (match.starters || []).map(s => s.playerId).filter(Boolean);
-                const starterLimits = { '8人制': 8, '11人制': 11, 'フットサル': 5 };
-                const requiredStarters = starterLimits[match.format];
-                
-                if (requiredStarters && starterPlayerIds.length !== requiredStarters) {
-                    console.error(`${match.format}の試合では、先発選手を${requiredStarters}人選択してください。`);
-                    return;
+                if (!opponent) return;
+
+                const matchData = {
+                    date, matchCategory, opponent, 
+                    ownScore: parseInt(ownScore, 10), 
+                    opponentScore: parseInt(opponentScore, 10), 
+                    result, starters, subs, goals, cautions, ejections
+                };
+
+                const matchesCollectionPath = `artifacts/${appId}/public/data/matches`;
+
+                if (existingMatch) {
+                    await db.collection(matchesCollectionPath).doc(existingMatch.id).update(matchData);
+                } else {
+                    await db.collection(matchesCollectionPath).add(matchData);
                 }
-
-                const path = `artifacts/${appId}/public/data/matches`;
-                const data = { ...match, ownScore: parseInt(match.ownScore, 10) || 0, opponentScore: parseInt(match.opponentScore, 10) || 0, ownPkScore: parseInt(match.ownPkScore, 10) || 0, opponentPkScore: parseInt(match.opponentPkScore, 10) || 0, matchCategories: selectedCategories };
-                try {
-                    if (existingMatch) await db.collection(path).doc(existingMatch.id).update(data);
-                    else await db.collection(path).add(data);
-                    navigate('match-list');
-                } catch (error) { console.error("Error saving document: ", error); }
+                navigate('match-list');
             };
 
-            const participatingPlayers = useMemo(() => {
-                const starterIds = (match.starters || []).map(s => s.playerId);
-                const subInIds = (match.subs || []).map(s => s.playerIn);
-                const allIds = [...new Set([...starterIds, ...subInIds])];
-                return players.filter(p => allIds.includes(p.id));
-            }, [players, match.starters, match.subs]);
+            return (
+                <form onSubmit={handleSubmit} className="max-w-3xl mx-auto bg-gray-800 p-6 rounded-lg border border-gray-700 space-y-6">
+                    <h2 className="text-2xl font-bold border-b border-gray-700 pb-3">{existingMatch ? '試合記録の編集' : '新しい試合の記録'}</h2>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400">試合日</label>
+                            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white text-sm" required />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400">カテゴリー</label>
+                            <select value={matchCategory} onChange={(e) => setMatchCategory(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white text-sm">
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400">対戦相手</label>
+                            <input type="text" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white text-sm" placeholder="〇〇FC" required />
+                        </div>
+                    </div>
 
-            const availableStarters = (currentIndex) => {
-                const selectedIds = (match.starters || []).map((s, i) => i !== currentIndex ? s.playerId : null).filter(Boolean);
-                return filteredPlayers.filter(p => !selectedIds.includes(p.id));
-            };
+                    <div className="grid grid-cols-3 gap-4 bg-gray-900 p-4 rounded-lg items-center">
+                        <div className="text-center">
+                            <label className="block text-xs font-medium text-gray-400 mb-1">古堅南FC</label>
+                            <input type="number" value={ownScore} onChange={(e) => setOwnScore(parseInt(e.target.value, 10) || 0)} className="w-16 bg-gray-700 border border-gray-600 rounded-md py-2 text-center text-xl font-bold text-white" min="0" />
+                        </div>
+                        <div className="text-center text-gray-500 font-bold text-xl">VS</div>
+                        <div className="text-center">
+                            <label className="block text-xs font-medium text-gray-400 mb-1">相手チーム</label>
+                            <input type="number" value={opponentScore} onChange={(e) => setOpponentScore(parseInt(e.target.value, 10) || 0)} className="w-16 bg-gray-700 border border-gray-600 rounded-md py-2 text-center text-xl font-bold text-white" min="0" />
+                        </div>
+                    </div>
 
-            return (<form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto"><FormSection title={existingMatch ? "試合記録を編集" : "基本情報"}><div className="grid md:grid-cols-2 gap-6">
-                <InputField label="日付" type="date" name="date" value={match.date} onChange={handleChange} required />
-                <SelectField label="試合のカテゴリー" name="matchCategory" value={match.matchCategory} onChange={handleChange} options={['U12', 'U11', 'U10', 'その他']} />
-                <SelectField label="試合形式" name="matchType" value={match.matchType} onChange={handleChange} options={['TRM', '公式戦', 'カップ戦', 'その他']} />
-                {(match.matchType === '公式戦' || match.matchType === 'カップ戦') && <InputField label="大会名" name="tournamentName" value={match.tournamentName || ''} onChange={handleChange} placeholder="例：〇〇カップ" />}
-                <InputField label="対戦相手" name="opponent" value={match.opponent} onChange={handleChange} placeholder="例：△△FC" required />
-                <InputField label="会場" name="venue" value={match.venue} onChange={handleChange} placeholder="例：〇〇グラウンド" />
-                <SelectField label="形式" name="format" value={match.format} onChange={handleChange} options={['-', '8人制', '11人制', 'フットサル', 'その他']} />
-                <SelectField label="天気" name="weather" value={match.weather} onChange={handleChange} options={['晴れ', '曇り', '雨', '雪']} />
-                <SelectField label="結果" name="result" value={match.result} onChange={handleChange} options={['勝利', '敗戦', '引分']} />
-                <InputField label="自チーム得点" type="number" name="ownScore" value={match.ownScore} onChange={handleChange} />
-                <InputField label="相手チーム得点" type="number" name="opponentScore" value={match.opponentScore} onChange={handleChange} />
-                <div className="md:col-span-2 grid grid-cols-2 gap-4">
-                    <SelectField label="試合レギュレーション" name="regulation" value={match.regulation} onChange={handleChange} options={['前後半', '3ピリオド', '1本']} />
-                    <InputField label={match.regulation === '前後半' ? '時間（分ハーフ）' : '時間（分）'} type="number" name="regulationTime" value={match.regulationTime} onChange={handleChange} />
-                </div>
-                {match.result === '引分' && (
-                    <div className="md:col-span-2 bg-gray-900 p-4 rounded-lg space-y-4">
-                        <label className="flex items-center space-x-3"><input type="checkbox" name="pkExists" checked={match.pkExists || false} onChange={handleChange} className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500" /><span>PK戦あり</span></label>
-                        {match.pkExists && (
-                            <div className="grid grid-cols-3 gap-4">
-                                <InputField label="自チームPK得点" type="number" name="ownPkScore" value={match.ownPkScore || 0} onChange={handleChange} />
-                                <InputField label="相手PK得点" type="number" name="opponentPkScore" value={match.opponentPkScore || 0} onChange={handleChange} />
-                                <SelectField label="PK戦結果" name="pkResult" value={match.pkResult || 'PK勝'} onChange={handleChange} options={['PK勝', 'PK敗']} />
-                            </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">スターティングメンバー (選択中: {starters.length}人)</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-gray-900 p-3 rounded-lg max-h-48 overflow-y-auto">
+                            {[...players].sort((a,b)=>a.number-b.number).map(p => {
+                                const isSelected = starters.some(s => s.playerId === p.id);
+                                return (
+                                    <button 
+                                        type="button" 
+                                        key={p.id} 
+                                        onClick={() => toggleStarter(p.id)}
+                                        className={`p-2 text-left text-xs rounded-md border flex justify-between items-center transition-colors ${isSelected ? 'bg-sky-600 border-sky-400 text-white font-bold' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'}`}
+                                    >
+                                        <span>#{p.number} {p.name}</span>
+                                        <span className="text-[10px] text-gray-400">({p.category})</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-900 p-4 rounded-lg space-y-3">
+                        <label className="block text-sm font-medium text-gray-300">得点/アシストの記録</label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <select value={currentScorer} onChange={(e) => setCurrentScorer(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md p-2 text-xs flex-1 text-white">
+                                <option value="">-- 得点者 --</option>
+                                {[...players].sort((a,b)=>a.number-b.number).map(p => <option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}
+                            </select>
+                            <select value={currentAssist} onChange={(e) => setCurrentAssist(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md p-2 text-xs flex-1 text-white">
+                                <option value="">-- アシスト者 (任意) --</option>
+                                {[...players].sort((a,b)=>a.number-b.number).map(p => <option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}
+                            </select>
+                            <button type="button" onClick={addGoal} className="bg-green-600 hover:bg-green-500 text-white font-bold text-xs px-4 py-2 rounded-md">追加</button>
+                        </div>
+                        {goals.length > 0 && (
+                            <ul className="space-y-1 text-xs text-gray-300 bg-gray-800 p-2 rounded border border-gray-700">
+                                {goals.map((g, i) => (
+                                    <li key={i} className="flex justify-between items-center bg-gray-850 p-1.5 rounded">
+                                        <span>
+                                            [{i+1}] 得点: {players.find(p=>p.id===g.scorerId)?.name || '不明'} 
+                                            {g.assistId && ` / アシスト: ${players.find(p=>p.id===g.assistId)?.name || '不明'}`}
+                                        </span>
+                                        <button type="button" onClick={() => removeGoal(i)} className="text-red-400 hover:text-red-300">削除</button>
+                                    </li>
+                                ))}
+                            </ul>
                         )}
                     </div>
-                )}
-            </div></FormSection>
-            <FormSection title="出場選手">
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-400">出場選手カテゴリーで絞り込み</label>
-                    <div className="flex flex-wrap gap-4 mt-2">
-                        {categories.map(cat => (
-                            <label key={cat} className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedCategories.includes(cat)}
-                                    onChange={() => handleCategoryChange(cat)}
-                                    className="h-5 w-5 rounded border-gray-500 bg-gray-800 text-sky-500 focus:ring-sky-500"
-                                />
-                                <span>{cat}</span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-8">
-                    <div>
-                        <h4 className="font-semibold text-gray-300 mb-3">先発出場選手</h4>
-                        <div className="space-y-2">
-                            {(match.starters || []).map((starter, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <SelectField label="" name="position" value={starter.position} onChange={(e) => handleStarterChange(index, 'position', e.target.value)} options={positions} />
-                                    <SelectField label="" name="playerId" value={starter.playerId} onChange={(e) => handleStarterChange(index, 'playerId', e.target.value)} options={availableStarters(index).map(p => ({ value: p.id, label: `${p.number} ${p.name}`}))} defaultOption="選手を選択" />
-                                    <button type="button" onClick={() => removeStarter(index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
-                                </div>
-                            ))}
-                            {(match.format === 'その他') && <button type="button" onClick={addStarter} className="text-sm text-sky-400 hover:underline">先発選手を追加</button>}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-gray-900 p-3 rounded-lg space-y-2">
+                            <label className="block text-xs font-medium text-gray-300">交代</label>
+                            <select value={subOut} onChange={(e) => setSubOut(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md p-1.5 text-xs w-full text-white">
+                                <option value="">-- OUT --</option>
+                                {players.map(p => <option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}
+                            </select>
+                            <select value={subIn} onChange={(e) => setSubIn(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md p-1.5 text-xs w-full text-white">
+                                <option value="">-- IN --</option>
+                                {players.map(p => <option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}
+                            </select>
+                            <button type="button" onClick={addSub} className="bg-gray-700 hover:bg-gray-600 text-white font-bold text-xs w-full py-1 rounded">交代追加</button>
+                            <p className="text-[10px] text-gray-400">登録済み: {subs.length}件</p>
+                        </div>
+
+                        <div className="bg-gray-900 p-3 rounded-lg space-y-2">
+                            <label className="block text-xs font-medium text-yellow-500">警告 (イエロー)</label>
+                            <select value={cautionPlayer} onChange={(e) => setCautionPlayer(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md p-1.5 text-xs w-full text-white">
+                                <option value="">-- 選手 --</option>
+                                {players.map(p => <option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}
+                            </select>
+                            <button type="button" onClick={addCaution} className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-xs w-full py-1 rounded">警告追加</button>
+                            <p className="text-[10px] text-gray-400">登録済み: {cautions.length}件</p>
+                        </div>
+
+                        <div className="bg-gray-900 p-3 rounded-lg space-y-2">
+                            <label className="block text-xs font-medium text-red-500">退場 (レッド)</label>
+                            <select value={ejectionPlayer} onChange={(e) => setEjectionPlayer(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md p-1.5 text-xs w-full text-white">
+                                <option value="">-- 選手 --</option>
+                                {players.map(p => <option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}
+                            </select>
+                            <button type="button" onClick={addEjection} className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs w-full py-1 rounded">退場追加</button>
+                            <p className="text-[10px] text-gray-400">登録済み: {ejections.length}件</p>
                         </div>
                     </div>
-                    <div>
-                        <h4 className="font-semibold text-gray-300 mb-3">途中出場選手</h4>
-                        <div className="space-y-2">
-                            {(match.subs || []).map((sub, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <SelectField label="" name="playerOut" value={sub.playerOut} onChange={(e) => handleSubChange(index, 'playerOut', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="OUT" />
-                                    <SelectField label="" name="playerIn" value={sub.playerIn} onChange={(e) => handleSubChange(index, 'playerIn', e.target.value)} options={filteredPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}`}))} defaultOption="IN" />
-                                    <button type="button" onClick={() => removeSub(index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button>
-                                </div>
-                            ))}
-                            <button type="button" onClick={addSub} className="text-sm text-sky-400 hover:underline">交代選手を追加</button>
-                        </div>
+
+                    <div className="flex gap-4 border-t border-gray-700 pt-4">
+                        <button type="submit" className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-md">{existingMatch ? '変更を保存' : '試合結果を登録'}</button>
+                        <button type="button" onClick={() => navigate('match-list')} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg">キャンセル</button>
                     </div>
-                </div>
-            </FormSection>
-            <FormSection title="得点記録">{(match.goals || []).map((goal, index) => (<div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4 p-4 bg-gray-900 rounded-lg"><SelectField label={`得点者 ${index + 1}`} name="scorerId" value={goal.scorerId} onChange={(e) => handleGoalChange(index, 'scorerId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="得点者を選択" /><SelectField label={`アシスト ${index + 1}`} name="assistId" value={goal.assistId} onChange={(e) => handleGoalChange(index, 'assistId', e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="アシスト者を選択" /><button type="button" onClick={() => removeGoal(index)} className="mt-6 bg-red-800 text-white px-3 py-2 rounded-md hover:bg-red-700">削除</button></div>))}<button type="button" onClick={addGoal} className="bg-sky-800 text-sky-200 font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition duration-300">得点を追加</button></FormSection><FormSection title="警告・退場"><div className="grid md:grid-cols-2 gap-8"><div><h4 className="font-semibold text-gray-300 mb-2">警告</h4>{(match.cautions || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('cautions', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('cautions', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('cautions')} className="text-sm text-sky-400 hover:underline">警告を追加</button></div><div><h4 className="font-semibold text-gray-300 mb-2">退場</h4>{(match.ejections || []).map((card, index) => (<div key={index} className="flex items-center gap-2 mb-2"><SelectField label="" name="playerId" value={card.playerId} onChange={(e) => handleCardChange('ejections', index, e.target.value)} options={participatingPlayers.map(p => ({ value: p.id, label: `${p.number} ${p.name}` }))} defaultOption="選手を選択" /><button type="button" onClick={() => removeCard('ejections', index)} className="p-1 text-red-400 hover:text-red-300"><IconTrash /></button></div>))}<button type="button" onClick={() => addCard('ejections')} className="text-sm text-sky-400 hover:underline">退場を追加</button></div></div></FormSection><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={() => navigate('match-list')} className="bg-gray-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-500">保存</button></div></form>);
-        }
-        
-    function EditStatsModal({ player, onSave, onClose }) {
-            const [stats, setStats] = useState(player.baseStats || { matchesPlayed: 0, goals: 0, assists: 0, cautions: 0, ejections: 0 });
-            const handleChange = (e) => setStats(prev => ({ ...prev, [e.target.name]: parseInt(e.target.value, 10) || 0 }));
-            const handleSubmit = (e) => { e.preventDefault(); onSave(player.id, stats); };
-            const fields = [{ label: '出場試合数', name: 'matchesPlayed' }, { label: '得点', name: 'goals' }, { label: 'アシスト', name: 'assists' }, { label: '警告', name: 'cautions' }, { label: '退場', name: 'ejections' }];
-            return (<div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50"><div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 w-full max-w-md m-4"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-white">{player.name} の基礎記録を編集</h3><button onClick={onClose} className="text-gray-400 hover:text-white"><IconX /></button></div><p className="text-sm text-gray-400 mb-6">ここでの入力は、アプリで記録された成績に加算される基礎値となります。</p><form onSubmit={handleSubmit}><div className="grid grid-cols-2 gap-4">{fields.map(f => (<div key={f.name}><label className="block text-sm font-medium text-gray-400">{f.label}</label><input type="number" name={f.name} value={stats[f.name]} onChange={handleChange} className="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3" /></div>))}</div><div className="mt-8 flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-500">キャンセル</button><button type="submit" className="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">保存</button></div></form></div></div>);
+                </form>
+            );
         }
 
-        const FormSection = ({ title, children }) => (<div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700"><h3 className="text-xl font-semibold mb-6 border-b border-gray-700 pb-3 text-white">{title}</h3>{children}</div>);
-        const InputField = ({ label, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><input {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500" /></div>);
-        const SelectField = ({ label, name, value, onChange, options, defaultOption, ...props }) => (<div>{label && <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>}<select name={name} value={value} onChange={onChange} {...props} className="block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500">{defaultOption && <option value="">{defaultOption}</option>}{options.map((opt, index) => (typeof opt === 'object' ? <option key={opt.value || index} value={opt.value}>{opt.label}</option> : <option key={opt} value={opt}>{opt}</option>))}</select></div>);
-        
-        // 【修正】React 18の新しい画面描画（レンダリング）の記述に変更します
+        function PlayerStatsList({ playerStats }) {
+            const [sortKey, setSortKey] = useState('number');
+            const [sortAsc, setSortAsc] = useState(true);
+
+            const handleSort = (key) => {
+                if (sortKey === key) {
+                    setSortAsc(!sortAsc);
+                } else {
+                    setSortKey(key);
+                    setSortAsc(false);
+                }
+            };
+
+            const sortedStats = useMemo(() => {
+                return [...playerStats].sort((a, b) => {
+                    let valA = a[sortKey];
+                    let valB = b[sortKey];
+                    if (sortKey === 'number') {
+                        return sortAsc ? valA - valB : valB - valA;
+                    }
+                    return sortAsc ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+                });
+            }, [playerStats, sortKey, sortAsc]);
+
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-3xl font-bold text-center">選手成績一覧</h2>
+                    <p className="text-center text-xs text-gray-400">各項目をクリックすると並び替えができます。</p>
+                    
+                    <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 max-w-5xl mx-auto overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-700 text-gray-400 cursor-pointer select-none">
+                                    <th onClick={() => handleSort('number')} className="py-3 px-4 hover:text-white">背番号 {sortKey === 'number' && (sortAsc ? '▲' : '▼')}</th>
+                                    <th onClick={() => handleSort('name')} className="py-3 px-4 hover:text-white">選手名</th>
+                                    <th onClick={() => handleSort('category')} className="py-3 px-4 hover:text-white">カテゴリ</th>
+                                    <th onClick={() => handleSort('totalMatchesPlayed')} className="py-3 px-4 text-center hover:text-white">出場試合数</th>
+                                    <th onClick={() => handleSort('totalGoals')} className="py-3 px-4 text-center hover:text-white text-red-400">得点</th>
+                                    <th onClick={() => handleSort('totalAssists')} className="py-3 px-4 text-center hover:text-white text-sky-400">アシスト</th>
+                                    <th onClick={() => handleSort('totalCautions')} className="py-3 px-4 text-center hover:text-white text-yellow-500">警告</th>
+                                    <th onClick={() => handleSort('totalEjections')} className="py-3 px-4 text-center hover:text-white text-red-500">退場</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sortedStats.map(p => (
+                                    <tr key={p.id} className="border-b border-gray-700 hover:bg-gray-750">
+                                        <td className="py-3 px-4 font-mono">#{p.number}</td>
+                                        <td className="py-3 px-4 font-bold">{p.name}</td>
+                                        <td className="py-3 px-4 text-xs text-gray-400">{p.category}</td>
+                                        <td className="py-3 px-4 text-center font-bold">{p.totalMatchesPlayed}</td>
+                                        <td className="py-3 px-4 text-center text-red-400 font-bold">{p.totalGoals}</td>
+                                        <td className="py-3 px-4 text-center text-sky-400 font-bold">{p.totalAssists}</td>
+                                        <td className="py-3 px-4 text-center text-yellow-600">{p.totalCautions}</td>
+                                        <td className="py-3 px-4 text-center text-red-600">{p.totalEjections}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
         const container = document.getElementById('root');
         const root = ReactDOM.createRoot(container);
         root.render(<App />);
-      }
+      };
     </script>
 </body>
 </html>
